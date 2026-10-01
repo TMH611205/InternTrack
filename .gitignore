@@ -1,0 +1,9 @@
+/vendor/
+/.env
+/.env.*
+!/.env.example
+/uploads/**
+!/uploads/**/
+!/uploads/.htaccess
+!/uploads/**/.htaccess
+!/uploads/**/.gitkeep

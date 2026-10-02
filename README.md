@@ -21,6 +21,8 @@ InternTrack là ứng dụng quản lý kỳ thực tập dành cho sinh viên, 
 7. Chỉ import `database/seed.sql` nếu cần dữ liệu mẫu để xem các màn hình và luồng nghiệp vụ. Không dùng dữ liệu seed làm tài khoản production; trang đăng nhập không còn hiển thị tài khoản hoặc mật khẩu demo.
 8. Mở `http://localhost/InternTrack/`.
 
+Ứng dụng hướng tới sinh viên Đại học Vinh và cơ hội thực tập tại Vinh, Nghệ An. Tên công ty, địa chỉ và tin tuyển dụng trong `database/seed.sql` chỉ là dữ liệu minh họa, không phải thông tin doanh nghiệp xác thực. Hãy thay bằng tên và địa chỉ đã được doanh nghiệp xác nhận trước khi công bố. Tin tuyển dụng chỉ hiển thị khi hồ sơ công ty có địa chỉ và tin có địa điểm làm việc rõ ràng; với công việc từ xa, ghi rõ “Từ xa”.
+
 ### Tài khoản demo mặc định (dùng cho môi trường local)
 
 Sau khi import `database/seed.sql`, có thể đăng nhập bằng các tài khoản sau. Đây là tài khoản mẫu chỉ dành cho local/test và không dùng cho production.

@@ -2,6 +2,7 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 START TRANSACTION;
 
 -- Optional local fixture accounts and sample records. Never import this file in production.
+-- Company names and addresses below are illustrative; replace them with verified business data before publication.
 UPDATE users
 SET password_hash = '$2y$10$e0Iu63wx52DpsU770zzmAeoQHrtjW9sr.WV49yfgFWusmKft3YkzG',
     full_name = 'Quản trị viên'
@@ -23,33 +24,33 @@ INSERT INTO users (username, email, password_hash, full_name, phone, role, statu
 ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), status = 'active';
 
 INSERT INTO students (user_id, student_code, gender, address, major, class_name, faculty, university, bio)
-SELECT id, 'UX22-0418', 'female', 'Quận Bình Thạnh, TP. Hồ Chí Minh', 'Thiết kế trải nghiệm người dùng', 'UXD22A', 'Mỹ thuật công nghiệp', 'Đại học Kiến trúc TP. Hồ Chí Minh', 'Quan tâm đến sản phẩm số dễ hiểu và tôn trọng thời gian người dùng.' FROM users WHERE username = 'student'
+SELECT id, 'UX22-0418', 'female', 'TP. Vinh, Nghệ An', 'Thiết kế trải nghiệm người dùng', 'UXD22A', 'Mỹ thuật công nghiệp', 'Đại học Vinh', 'Quan tâm đến sản phẩm số dễ hiểu và tôn trọng thời gian người dùng.' FROM users WHERE username = 'student'
 ON DUPLICATE KEY UPDATE major = VALUES(major), class_name = VALUES(class_name);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'UX22-0431', 'female', 'Thiết kế trải nghiệm người dùng', 'UXD22C', 'Mỹ thuật công nghiệp', 'Đại học Kiến trúc TP. Hồ Chí Minh' FROM users WHERE username = 'han'
+SELECT id, 'UX22-0431', 'female', 'Thiết kế trải nghiệm người dùng', 'UXD22C', 'Mỹ thuật công nghiệp', 'Đại học Vinh' FROM users WHERE username = 'han'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'FE22-0132', 'male', 'Kỹ thuật phần mềm', 'SE22A', 'Công nghệ thông tin', 'Đại học Công nghệ TP. Hồ Chí Minh' FROM users WHERE username = 'bao'
+SELECT id, 'FE22-0132', 'male', 'Kỹ thuật phần mềm', 'SE22A', 'Công nghệ thông tin', 'Đại học Vinh' FROM users WHERE username = 'bao'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'UX22-0424', 'female', 'Thiết kế trải nghiệm người dùng', 'UXD22B', 'Mỹ thuật công nghiệp', 'Đại học Kiến trúc TP. Hồ Chí Minh' FROM users WHERE username = 'vy'
+SELECT id, 'UX22-0424', 'female', 'Thiết kế trải nghiệm người dùng', 'UXD22B', 'Mỹ thuật công nghiệp', 'Đại học Vinh' FROM users WHERE username = 'vy'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'CT22-0079', 'female', 'Truyền thông số', 'DMC22A', 'Truyền thông', 'Đại học Hoa Sen' FROM users WHERE username = 'thao'
+SELECT id, 'CT22-0079', 'female', 'Truyền thông số', 'DMC22A', 'Truyền thông', 'Đại học Vinh' FROM users WHERE username = 'thao'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'NS-2021-018', 'Northstar Studio', 'https://northstar.studio', 'people@northstar.studio', '+842838220188', '18 Nguyễn Thị Minh Khai, Quận 1, TP. Hồ Chí Minh', 'Studio sản phẩm độc lập, đồng hành cùng doanh nghiệp xây dựng trải nghiệm số có ý nghĩa.', 'active' FROM users WHERE username = 'company'
-ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), status = 'active';
+SELECT id, 'NS-2021-018', 'Sông Lam Digital', 'https://northstar.studio', 'people@northstar.studio', '+842383220188', 'Đường Lê Nin, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, đồng hành cùng sinh viên trong các dự án sản phẩm số.', 'active' FROM users WHERE username = 'company'
+ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'ML-2020-042', 'Mộc Lab', 'https://moclab.example', 'hello@moclab.example', '+842838220189', 'Quận 3, TP. Hồ Chí Minh', 'Nhóm thiết kế trải nghiệm cho sản phẩm giáo dục và cộng đồng.', 'active' FROM users WHERE username = 'moclab'
-ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), status = 'active';
+SELECT id, 'ML-2020-042', 'Nghệ An UX Lab', 'https://moclab.example', 'hello@moclab.example', '+842383220189', 'Đường Nguyễn Thị Minh Khai, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, nghiên cứu trải nghiệm cho sản phẩm giáo dục và cộng đồng.', 'active' FROM users WHERE username = 'moclab'
+ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'MC-2024-011', 'Mây Creative', 'https://maycreative.example', 'careers@maycreative.example', '+842838220190', 'Quận 1, TP. Hồ Chí Minh', 'Đội ngũ sáng tạo thương hiệu và sản phẩm số.', 'active' FROM users WHERE username = 'maycreative'
-ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), status = 'active';
+SELECT id, 'MC-2024-011', 'Vinh Creative Studio', 'https://maycreative.example', 'careers@maycreative.example', '+842383220190', 'Đường Trường Thi, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, phát triển nhận diện thương hiệu và sản phẩm số.', 'active' FROM users WHERE username = 'maycreative'
+ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'LH-2023-028', 'Lá House', 'https://lahouse.example', 'team@lahouse.example', '+842838220191', 'Remote · TP. Hồ Chí Minh', 'Doanh nghiệp công nghệ phục vụ các cửa hàng bán lẻ độc lập.', 'active' FROM users WHERE username = 'lahouse'
-ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), status = 'active';
+SELECT id, 'LH-2023-028', 'Cửa Lò Media', 'https://lahouse.example', 'team@lahouse.example', '+842383220191', 'Đường Nguyễn Văn Cừ, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Nghệ An, xây dựng nội dung và giải pháp số cho bán lẻ.', 'active' FROM users WHERE username = 'lahouse'
+ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 
 INSERT INTO lecturers (user_id, lecturer_code, department, academic_title, specialization)
 SELECT id, 'GV-UX-001', 'Khoa Công nghệ thông tin', 'Thạc sĩ', 'Thiết kế tương tác và trải nghiệm người dùng' FROM users WHERE username = 'lecturer'
@@ -62,14 +63,34 @@ INSERT INTO positions (company_id, title, description, requirements, benefits, l
 SELECT c.id, seed.title, seed.description, seed.requirements, seed.benefits, seed.location, seed.quantity, seed.deadline, 'open'
 FROM companies c
 JOIN (
-    SELECT 'NS-2021-018' AS company_code, 'Product Design Intern' AS title, 'Thiết kế luồng onboarding cho nền tảng quản lý bán lẻ và kiểm chứng giải pháp với người dùng.' AS description, 'Sinh viên năm 3–4 ngành thiết kế hoặc công nghệ; có portfolio và tinh thần chủ động.' AS requirements, 'Có mentor đồng hành, hỗ trợ chi phí thực tập và cơ hội tham gia sản phẩm thật.' AS benefits, 'Hybrid · Quận 3, TP. Hồ Chí Minh' AS location, 2 AS quantity, '2026-10-15' AS deadline
-    UNION ALL SELECT 'ML-2020-042', 'UX Research Intern', 'Tham gia nghiên cứu hành vi và kiểm thử sản phẩm giáo dục.', 'Sinh viên ngành UX, tâm lý học hoặc nghiên cứu; biết tổng hợp insight.', 'Mentor nghiên cứu, ngân sách phỏng vấn người dùng.', 'Quận 3, TP. Hồ Chí Minh', 1, '2026-10-18'
-    UNION ALL SELECT 'NS-2021-018', 'Frontend Developer Intern', 'Xây dựng và kiểm thử giao diện web cùng nhóm sản phẩm.', 'Nắm HTML, CSS, JavaScript cơ bản; biết Git là lợi thế.', 'Code review hằng tuần, lịch làm việc linh hoạt.', 'TP. Hồ Chí Minh · Hybrid', 1, '2026-10-25'
-    UNION ALL SELECT 'LH-2023-028', 'Content Intern', 'Lên kế hoạch và viết nội dung cho sản phẩm bán lẻ.', 'Có khả năng viết rõ ràng, biết tìm hiểu người dùng.', 'Hướng dẫn nội dung và portfolio sau kỳ thực tập.', 'Remote', 1, '2026-11-01'
-    UNION ALL SELECT 'MC-2024-011', 'Visual Designer Intern', 'Phát triển hệ thống hình ảnh cho thương hiệu và chiến dịch số.', 'Sinh viên thiết kế, có portfolio và kỹ năng Figma.', 'Tham gia dự án thực tế cùng đội ngũ sáng tạo.', 'Quận 1, TP. Hồ Chí Minh', 1, '2026-11-05'
+    SELECT 'NS-2021-018' AS company_code, 'Product Design Intern' AS title, 'Thiết kế luồng onboarding cho nền tảng quản lý bán lẻ và kiểm chứng giải pháp với người dùng.' AS description, 'Sinh viên năm 3–4 ngành thiết kế hoặc công nghệ; có portfolio và tinh thần chủ động.' AS requirements, 'Có mentor đồng hành, hỗ trợ chi phí thực tập và cơ hội tham gia sản phẩm thật.' AS benefits, 'Hybrid · TP. Vinh, Nghệ An' AS location, 2 AS quantity, '2026-10-15' AS deadline
+    UNION ALL SELECT 'ML-2020-042', 'UX Research Intern', 'Tham gia nghiên cứu hành vi và kiểm thử sản phẩm giáo dục.', 'Sinh viên ngành UX, tâm lý học hoặc nghiên cứu; biết tổng hợp insight.', 'Mentor nghiên cứu, ngân sách phỏng vấn người dùng.', 'TP. Vinh, Nghệ An', 1, '2026-10-18'
+    UNION ALL SELECT 'NS-2021-018', 'Frontend Developer Intern', 'Xây dựng và kiểm thử giao diện web cùng nhóm sản phẩm.', 'Nắm HTML, CSS, JavaScript cơ bản; biết Git là lợi thế.', 'Code review hằng tuần, lịch làm việc linh hoạt.', 'TP. Vinh · Hybrid', 1, '2026-10-25'
+    UNION ALL SELECT 'LH-2023-028', 'Content Intern', 'Lên kế hoạch và viết nội dung cho sản phẩm bán lẻ.', 'Có khả năng viết rõ ràng, biết tìm hiểu người dùng.', 'Hướng dẫn nội dung và portfolio sau kỳ thực tập.', 'Từ xa · Doanh nghiệp tại TP. Vinh', 1, '2026-11-01'
+    UNION ALL SELECT 'MC-2024-011', 'Visual Designer Intern', 'Phát triển hệ thống hình ảnh cho thương hiệu và chiến dịch số.', 'Sinh viên thiết kế, có portfolio và kỹ năng Figma.', 'Tham gia dự án thực tế cùng đội ngũ sáng tạo.', 'TP. Vinh, Nghệ An', 1, '2026-11-05'
 ) AS seed ON seed.company_code = c.company_code
 WHERE c.status = 'active'
   AND NOT EXISTS (SELECT 1 FROM positions p WHERE p.company_id = c.id AND p.title = seed.title);
+
+UPDATE positions p
+JOIN companies c ON c.id = p.company_id
+SET p.location = CASE
+    WHEN c.company_code = 'NS-2021-018' AND p.title = 'Product Design Intern' THEN 'Hybrid · TP. Vinh, Nghệ An'
+    WHEN c.company_code = 'ML-2020-042' AND p.title = 'UX Research Intern' THEN 'TP. Vinh, Nghệ An'
+    WHEN c.company_code = 'NS-2021-018' AND p.title = 'Frontend Developer Intern' THEN 'TP. Vinh · Hybrid'
+    WHEN c.company_code = 'LH-2023-028' AND p.title = 'Content Intern' THEN 'Từ xa · Doanh nghiệp tại TP. Vinh'
+    WHEN c.company_code = 'MC-2024-011' AND p.title = 'Visual Designer Intern' THEN 'TP. Vinh, Nghệ An'
+    ELSE p.location
+END
+WHERE (c.company_code = 'NS-2021-018' AND p.title IN ('Product Design Intern', 'Frontend Developer Intern'))
+   OR (c.company_code = 'ML-2020-042' AND p.title = 'UX Research Intern')
+   OR (c.company_code = 'LH-2023-028' AND p.title = 'Content Intern')
+   OR (c.company_code = 'MC-2024-011' AND p.title = 'Visual Designer Intern');
+
+UPDATE students s
+JOIN users u ON u.id = s.user_id
+SET s.address = 'TP. Vinh, Nghệ An', s.university = 'Đại học Vinh'
+WHERE u.username IN ('student', 'han', 'bao', 'vy', 'thao');
 
 INSERT INTO internships (student_id, company_id, position_id, lecturer_id, start_date, end_date, status, description)
 SELECT s.id, c.id, p.id, l.id, '2026-09-01', '2026-11-25', 'active', 'Thiết kế trải nghiệm onboarding và kiểm chứng giải pháp qua thử nghiệm người dùng.'

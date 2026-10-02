@@ -53,6 +53,14 @@ function action_internship(int $internshipId, array $user): array
     return $internship;
 }
 
+function action_require_company_address(int $companyId): void
+{
+    $company = page_one('SELECT address FROM companies WHERE id = ?', [$companyId]);
+    if (!$company || trim((string) $company['address']) === '') {
+        throw new DomainException('Doanh nghiệp cần cập nhật địa chỉ công ty trước khi mở tin tuyển dụng.');
+    }
+}
+
 // Lưu file upload vào thư mục uploads/ và kiểm tra MIME cũng như dung lượng trước khi lưu.
 function store_uploaded_file(array $file, string $folder, int $maximumBytes): ?string
 {
@@ -279,6 +287,17 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if ($deadline && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $deadline)) {
                 throw new DomainException('Hạn nhận hồ sơ không hợp lệ.');
             }
+            if ($status === 'open') {
+                if ($location === '') {
+                    throw new DomainException('Hãy nhập nơi làm việc; nếu làm từ xa, ghi rõ Từ xa.');
+                }
+                $companyId = (int) ($user['company_id'] ?? 0);
+                if ($user['role'] === 'admin' && $positionId) {
+                    $positionCompany = page_one('SELECT company_id FROM positions WHERE id = ?', [$positionId]);
+                    $companyId = (int) ($positionCompany['company_id'] ?? 0);
+                }
+                action_require_company_address($companyId);
+            }
             if ($user['role'] === 'company') {
                 if ($positionId) {
                     $statement = $connection->prepare('UPDATE positions SET title = ?, description = ?, requirements = ?, benefits = ?, location = ?, quantity = ?, deadline = ?, status = ? WHERE id = ? AND company_id = ?');
@@ -304,6 +323,22 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $status = action_value($input, 'status', 20);
             if (!in_array($status, ['draft', 'open', 'closed', 'cancelled'], true)) {
                 throw new DomainException('Trạng thái vị trí không hợp lệ.');
+            }
+            if ($status === 'open') {
+                $companySql = 'SELECT company_id, location FROM positions WHERE id = ?';
+                $companyParameters = [$positionId];
+                if ($user['role'] === 'company') {
+                    $companySql .= ' AND company_id = ?';
+                    $companyParameters[] = $user['company_id'];
+                }
+                $positionCompany = page_one($companySql, $companyParameters);
+                if (!$positionCompany) {
+                    throw new DomainException('Không tìm thấy vị trí hoặc bạn không có quyền cập nhật.');
+                }
+                if (trim((string) $positionCompany['location']) === '') {
+                    throw new DomainException('Hãy bổ sung địa điểm làm việc trước khi mở tin tuyển dụng.');
+                }
+                action_require_company_address((int) ($positionCompany['company_id'] ?? 0));
             }
             $sql = 'UPDATE positions SET status = ? WHERE id = ?';
             $parameters = [$status, $positionId];
@@ -476,8 +511,12 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $user = action_user(['student', 'company']);
             $fullName = action_value($input, 'full_name', 150);
             $phone = action_value($input, 'phone', 20);
+            $companyAddress = $user['role'] === 'company' ? action_value($input, 'address', 255) : '';
             if ($fullName === '' || ($phone !== '' && !preg_match('/^[0-9+() .-]{8,20}$/', $phone))) {
                 throw new DomainException('Họ tên hoặc số điện thoại không hợp lệ.');
+            }
+            if ($user['role'] === 'company' && $companyAddress === '') {
+                throw new DomainException('Hãy nhập địa chỉ đầy đủ của doanh nghiệp tại Vinh hoặc nơi doanh nghiệp hoạt động.');
             }
             $connection->prepare('UPDATE users SET full_name = ?, phone = ? WHERE id = ?')->execute([$fullName, $phone ?: null, $user['id']]);
             if ($user['role'] === 'student') {
@@ -492,7 +531,7 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     action_value($input, 'website', 255) ?: null,
                     action_value($input, 'company_email', 255) ?: null,
                     $phone ?: null,
-                    action_value($input, 'address', 255) ?: null,
+                    $companyAddress,
                     action_value($input, 'description', 10000) ?: null,
                     $user['id'],
                 ]);

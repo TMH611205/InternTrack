@@ -15,11 +15,12 @@ $formAction = '?page=' . rawurlencode($screen);
         <summary><span>+ Đăng vị trí mới</span><small>Tạo tin tuyển dụng cho doanh nghiệp</small></summary>
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form">
             <?= $csrfField ?><input type="hidden" name="action" value="position_save">
+            <p class="form-hint">Tin công khai hiển thị tên và địa chỉ công ty từ hồ sơ doanh nghiệp. Ưu tiên cơ hội tại TP. Vinh, Nghệ An.</p>
             <label>Tên vị trí<input name="title" maxlength="200" required></label>
             <label>Mô tả công việc<textarea name="description" rows="3" required></textarea></label>
             <label>Yêu cầu<textarea name="requirements" rows="2"></textarea></label>
             <label>Quyền lợi<textarea name="benefits" rows="2"></textarea></label>
-            <div class="form-grid"><label>Địa điểm<input name="location" maxlength="255"></label><label>Số lượng<input name="quantity" type="number" min="1" value="1" required></label><label>Hạn nhận hồ sơ<input name="deadline" type="date" min="<?= date('Y-m-d') ?>"></label><label>Trạng thái<select name="status">
+            <div class="form-grid"><label>Nơi làm việc<input name="location" maxlength="255" placeholder="TP. Vinh, Nghệ An hoặc Từ xa"></label><label>Số lượng<input name="quantity" type="number" min="1" value="1" required></label><label>Hạn nhận hồ sơ<input name="deadline" type="date" min="<?= date('Y-m-d') ?>"></label><label>Trạng thái<select name="status">
                         <option value="draft">Bản nháp</option>
                         <option value="open">Đang mở</option>
                     </select></label></div>
@@ -97,7 +98,7 @@ $formAction = '?page=' . rawurlencode($screen);
         <summary><span>Chỉnh sửa thông tin doanh nghiệp</span><small>Cập nhật liên hệ và phần giới thiệu</small></summary>
         <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form">
             <?= $csrfField ?><input type="hidden" name="action" value="profile_save">
-            <div class="form-grid"><label>Người liên hệ<input name="full_name" maxlength="150" value="<?= screen_escape($user['full_name']) ?>" required></label><label>Điện thoại<input name="phone" maxlength="20" value="<?= screen_escape($user['phone'] ?? '') ?>"></label><label>Website<input name="website" maxlength="255" value="<?= screen_escape($screenData['profile_record']['website'] ?? '') ?>"></label><label>Email liên hệ<input name="company_email" type="email" maxlength="255" value="<?= screen_escape($screenData['profile_record']['email'] ?? $user['email']) ?>"></label><label>Địa chỉ<input name="address" maxlength="255" value="<?= screen_escape($screenData['profile_record']['address'] ?? '') ?>"></label></div>
+            <div class="form-grid"><label>Người liên hệ<input name="full_name" maxlength="150" value="<?= screen_escape($user['full_name']) ?>" required></label><label>Điện thoại<input name="phone" maxlength="20" value="<?= screen_escape($user['phone'] ?? '') ?>"></label><label>Website<input name="website" maxlength="255" value="<?= screen_escape($screenData['profile_record']['website'] ?? '') ?>"></label><label>Email liên hệ<input name="company_email" type="email" maxlength="255" value="<?= screen_escape($screenData['profile_record']['email'] ?? $user['email']) ?>"></label><label>Địa chỉ công ty<input name="address" maxlength="255" placeholder="Số nhà, đường, phường, TP. Vinh, Nghệ An" value="<?= screen_escape($screenData['profile_record']['address'] ?? '') ?>" required></label></div>
             <label>Giới thiệu<textarea name="description" rows="4" maxlength="10000"><?= screen_escape($screenData['profile_record']['description'] ?? '') ?></textarea></label>
             <label>Ảnh đại diện (JPG, PNG, WebP · tối đa 10 MB)<input name="avatar_file" type="file" accept="image/jpeg,image/png,image/webp"></label>
             <button class="button button--primary" type="submit">Lưu hồ sơ</button>

@@ -9,6 +9,8 @@ $isReset = $screen === 'auth/reset-password';
 $resetAuthorization = $_SESSION['password_reset_authorized'] ?? null;
 $isPasswordStep = $isReset && is_array($resetAuthorization) && (int) ($resetAuthorization['expires_at'] ?? 0) >= time();
 $resetEmail = is_string($_SESSION['password_reset_email'] ?? null) ? $_SESSION['password_reset_email'] : '';
+$otpResendAt = (int) ($_SESSION['password_reset_otp_sent_at'] ?? 0);
+$otpResendRemaining = max(0, $otpResendAt + 60 - time());
 $authFlash = isset($flash) && is_array($flash) ? $flash : null;
 $authEscape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $authPageTitle = $isReset ? 'Đặt lại mật khẩu' : ($isForgot ? 'Khôi phục mật khẩu' : 'Đăng nhập');
@@ -31,7 +33,7 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/../../assets/css/style.css') ?>">
 </head>
 
 <body class="auth-body">
@@ -44,7 +46,7 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
                 <div class="auth-rule"><span>HỒ SƠ</span><span class="auth-rule-line"></span><span>PHÁT TRIỂN</span></div>
                 <p class="auth-caption">Một hành trình thực tập, cùng một mục tiêu rõ ràng.</p>
             </div>
-            <div class="auth-aside-footer"><span>INTERNTRACK</span><span>TP. HỒ CHÍ MINH</span></div>
+            <div class="auth-aside-footer"><span>INTERNTRACK</span><span>ĐẠI HỌC VINH · NGHỆ AN</span></div>
         </section>
         <section class="auth-main">
             <div class="auth-form-wrap">
@@ -68,9 +70,19 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
                     <?php if (!$isPasswordStep): ?>
                         <form class="auth-form" method="post" action="?page=auth/reset-password">
                             <input type="hidden" name="_csrf" value="<?= $authEscape(app_csrf_token()) ?>"><input type="hidden" name="action" value="password_reset_verify">
-                            <label for="otp">Mã OTP gồm 6 chữ số</label><input id="otp" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" required>
+                            <label for="otp-digit-1">Mã OTP gồm 6 chữ số</label>
+                            <div class="otp-digit-group" data-otp-inputs role="group" aria-label="Mã OTP gồm 6 chữ số">
+                                <?php for ($digit = 1; $digit <= 6; $digit++): ?>
+                                    <input id="otp-digit-<?= $digit ?>" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="Chữ số <?= $digit ?>" <?= $digit === 1 ? 'autocomplete="one-time-code"' : 'autocomplete="off"' ?> data-otp-digit required>
+                                <?php endfor; ?>
+                            </div>
+                            <input id="otp" name="otp" type="hidden" data-otp-value>
                             <button class="button button--primary auth-submit" type="submit">Xác minh OTP <span aria-hidden="true">↗</span></button>
-                            <a class="auth-inline-link" href="?page=auth/forgot-password">Yêu cầu gửi mã mới</a>
+                        </form>
+                        <form class="auth-resend-form" method="post" action="?page=auth/reset-password" data-otp-resend data-remaining="<?= $otpResendRemaining ?>">
+                            <input type="hidden" name="_csrf" value="<?= $authEscape(app_csrf_token()) ?>"><input type="hidden" name="action" value="password_reset_resend">
+                            <button class="auth-resend-button" type="submit" data-otp-resend-button>Gửi lại mã</button>
+                            <span class="auth-resend-countdown" data-otp-resend-countdown aria-live="polite"></span>
                         </form>
                     <?php else: ?>
                         <form class="auth-form" method="post" action="?page=auth/reset-password">
@@ -96,7 +108,7 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
         </section>
     </main>
     <div class="toast-message" role="status" aria-live="polite" data-toast-region></div>
-    <script src="assets/js/app.js" defer></script>
+    <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/../../assets/js/app.js') ?>" defer></script>
 </body>
 
 </html>

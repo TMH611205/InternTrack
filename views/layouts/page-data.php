@@ -62,7 +62,7 @@ return [
         'kind' => 'cards',
         'eyebrow' => 'Cơ hội nghề nghiệp',
         'title' => 'Cơ hội thực tập',
-        'description' => 'Những vị trí phù hợp để bạn thử sức, học cùng đội ngũ và tạo ra sản phẩm thật.',
+        'description' => 'Khám phá cơ hội thực tập tại TP. Vinh, Nghệ An. Mỗi tin hiển thị rõ công ty, địa chỉ và nơi làm việc.',
         'metrics' => [['label' => 'Vị trí đang mở', 'value' => '42', 'note' => 'Tại 28 doanh nghiệp'], ['label' => 'Phù hợp hồ sơ', 'value' => '12', 'note' => 'Theo ngành Thiết kế UX'], ['label' => 'Sắp hết hạn', 'value' => '05', 'note' => 'Trong 7 ngày tới']],
         'cards' => [['title' => 'Product Design Intern', 'meta' => 'Northstar Studio · TP. Hồ Chí Minh · Hybrid', 'description' => 'Thiết kế trải nghiệm cho nền tảng quản lý bán lẻ. Hạn nhận hồ sơ 15/09.', 'tag' => 'Phù hợp 94%'], ['title' => 'UX Research Intern', 'meta' => 'Mộc Lab · TP. Hồ Chí Minh · Tại văn phòng', 'description' => 'Tham gia nghiên cứu hành vi và kiểm thử sản phẩm giáo dục. Hạn 18/09.', 'tag' => 'Phù hợp 89%'], ['title' => 'Frontend Developer Intern', 'meta' => 'Lá House · Remote · 2 vị trí', 'description' => 'Xây dựng giao diện web cùng nhóm sản phẩm. Hạn nhận hồ sơ 23/09.', 'tag' => 'Đang tuyển']],
     ],

@@ -51,6 +51,86 @@ function page_week_bars(string $sql, array $parameters = []): array
     return $maximum ? array_map(static fn($value) => (int) round($value * 100 / $maximum), $bars) : $bars;
 }
 
+function page_recommendation_tokens(string $text): array
+{
+    $stopWords = array_fill_keys([
+        'and',
+        'are',
+        'for',
+        'from',
+        'have',
+        'into',
+        'the',
+        'their',
+        'with',
+        'các',
+        'cho',
+        'của',
+        'được',
+        'để',
+        'khi',
+        'là',
+        'một',
+        'những',
+        'trong',
+        'và',
+        'với',
+    ], true);
+    $tokens = preg_split('/[^\pL\pN]+/u', mb_strtolower($text, 'UTF-8'), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    return array_values(array_filter($tokens, static fn($token) => mb_strlen($token, 'UTF-8') > 2 && !isset($stopWords[$token])));
+}
+
+function page_recommendation_scores(array $profile, array $positions): array
+{
+    $profileTerms = [];
+    foreach ([['major', 2.5], ['bio', 1.0]] as [$field, $weight]) {
+        foreach (page_recommendation_tokens((string) ($profile[$field] ?? '')) as $token) {
+            $profileTerms[$token] = ($profileTerms[$token] ?? 0) + $weight;
+        }
+    }
+
+    $documents = [];
+    $documentFrequency = [];
+    foreach ($positions as $index => $position) {
+        $terms = [];
+        foreach ([['title', 3.0], ['requirements', 2.0], ['description', 1.0]] as [$field, $weight]) {
+            foreach (page_recommendation_tokens((string) ($position[$field] ?? '')) as $token) {
+                $terms[$token] = ($terms[$token] ?? 0) + $weight;
+            }
+        }
+        $documents[$index] = $terms;
+        foreach (array_keys($terms) as $token) {
+            $documentFrequency[$token] = ($documentFrequency[$token] ?? 0) + 1;
+        }
+    }
+
+    $documentCount = count($documents);
+    $inverseFrequency = static fn(string $token): float => log(1 + ($documentCount + 1) / (($documentFrequency[$token] ?? 0) + 1));
+    $profileVector = [];
+    foreach ($profileTerms as $token => $frequency) {
+        $profileVector[$token] = $frequency * $inverseFrequency($token);
+    }
+    $profileLength = sqrt(array_sum(array_map(static fn($weight) => $weight ** 2, $profileVector)));
+
+    $scores = [];
+    foreach ($documents as $index => $terms) {
+        $documentVector = [];
+        foreach ($terms as $token => $frequency) {
+            $documentVector[$token] = (1 + log($frequency)) * $inverseFrequency($token);
+        }
+        $documentLength = sqrt(array_sum(array_map(static fn($weight) => $weight ** 2, $documentVector)));
+        $dotProduct = 0.0;
+        foreach ($profileVector as $token => $weight) {
+            $dotProduct += $weight * ($documentVector[$token] ?? 0);
+        }
+        $scores[$index] = $profileLength > 0 && $documentLength > 0
+            ? (int) round(100 * $dotProduct / ($profileLength * $documentLength))
+            : 0;
+    }
+
+    return $scores;
+}
+
 // Tạo dữ liệu hiển thị động cho từng màn hình theo vai trò người dùng.
 // Hàm này xử lý phần lớn dữ liệu dashboard, bảng, card, profile và tiến độ của từng role.
 function load_screen_data(string $screen, array $data, array $user): array
@@ -109,26 +189,27 @@ function load_screen_data(string $screen, array $data, array $user): array
 
         case 'student/internships':
             $positions = page_all(
-                'SELECT p.id, p.title, p.description, p.requirements, p.location, p.quantity, p.deadline, c.company_name, a.status AS application_status FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id AND a.student_id = ? WHERE p.status = \'open\' AND (p.deadline IS NULL OR p.deadline >= CURDATE()) AND c.status = \'active\' ORDER BY p.deadline, p.created_at DESC',
+                'SELECT p.id, p.title, p.description, p.requirements, p.location, p.quantity, p.deadline, c.company_name, c.address AS company_address, a.status AS application_status FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id AND a.student_id = ? WHERE p.status = \'open\' AND (p.deadline IS NULL OR p.deadline >= CURDATE()) AND c.status = \'active\' AND TRIM(COALESCE(c.address, \'\')) <> \'\' AND TRIM(COALESCE(p.location, \'\')) <> \'\' ORDER BY p.deadline, p.created_at DESC',
                 [$studentId]
             );
             $studentProfile = page_one('SELECT major, bio FROM students WHERE id = ?', [$studentId]) ?: [];
-            $profileWords = preg_split('/[^\pL\pN]+/u', mb_strtolower(($studentProfile['major'] ?? '') . ' ' . ($studentProfile['bio'] ?? ''), 'UTF-8'), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $profileWords = array_values(array_unique(array_filter($profileWords, static fn($word) => mb_strlen($word, 'UTF-8') > 2)));
-            $positions = array_map(static function ($position) use ($profileWords): array {
-                $positionWords = preg_split('/[^\pL\pN]+/u', mb_strtolower($position['title'] . ' ' . $position['description'] . ' ' . $position['requirements'], 'UTF-8'), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                $positionWords = array_unique($positionWords);
-                $matches = array_intersect($profileWords, $positionWords);
-                $position['match_score'] = $profileWords ? (int) round(count($matches) * 100 / count($profileWords)) : 0;
-                return $position;
-            }, $positions);
+            $matchScores = page_recommendation_scores($studentProfile, $positions);
+            foreach ($positions as $index => &$position) {
+                $position['match_score'] = $matchScores[$index] ?? 0;
+            }
+            unset($position);
             usort($positions, static fn($left, $right) => ($right['match_score'] <=> $left['match_score']) ?: strcmp((string) $left['deadline'], (string) $right['deadline']));
             $data['cards'] = array_map(static fn($position) => [
                 'id' => (int) $position['id'],
                 'title' => $position['title'],
-                'meta' => $position['company_name'] . ' · ' . ($position['location'] ?: 'Chưa cập nhật địa điểm') . ' · ' . $position['quantity'] . ' vị trí',
-                'description' => mb_strimwidth((string) $position['description'], 0, 130, '…', 'UTF-8') . ' Hạn ' . page_date($position['deadline']) . '. Mức khớp từ khóa hồ sơ: ' . $position['match_score'] . '%.',
+                'meta' => ($position['location'] ?: 'Tại văn phòng công ty') . ' · ' . $position['quantity'] . ' vị trí',
+                'company_name' => $position['company_name'],
+                'company_address' => $position['company_address'],
+                'work_location' => $position['location'] ?: 'Tại văn phòng công ty',
+                'description' => mb_strimwidth((string) $position['description'], 0, 130, '…', 'UTF-8') . ' Hạn ' . page_date($position['deadline']) . '. Độ phù hợp hồ sơ: ' . $position['match_score'] . '%.',
                 'tag' => $position['application_status'] ? page_status_label($position['application_status'], $applicationLabels) : ($position['match_score'] >= 20 ? 'Gợi ý phù hợp · ' . $position['match_score'] . '%' : 'Đang tuyển'),
+                'match_score' => (int) $position['match_score'],
+                'deadline' => (string) ($position['deadline'] ?? ''),
             ], $positions);
             $data['metrics'] = [
                 ['label' => 'Vị trí đang mở', 'value' => (string) count($positions), 'note' => 'Ưu tiên vị trí khớp chuyên ngành'],
@@ -221,7 +302,7 @@ function load_screen_data(string $screen, array $data, array $user): array
 
         case 'student/internship-detail':
             $positionId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
-            $sql = 'SELECT p.*, c.company_name, c.address AS company_address, a.status AS application_status FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id AND a.student_id = ? WHERE p.status = \'open\' AND (p.deadline IS NULL OR p.deadline >= CURDATE())';
+            $sql = 'SELECT p.*, c.company_name, c.address AS company_address, a.status AS application_status FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id AND a.student_id = ? WHERE p.status = \'open\' AND (p.deadline IS NULL OR p.deadline >= CURDATE()) AND c.status = \'active\' AND TRIM(COALESCE(c.address, \'\')) <> \'\' AND TRIM(COALESCE(p.location, \'\')) <> \'\'';
             $parameters = [$studentId];
             if ($positionId) {
                 $sql .= ' AND p.id = ?';
@@ -231,7 +312,7 @@ function load_screen_data(string $screen, array $data, array $user): array
             $position = page_one($sql, $parameters);
             if ($position) {
                 $data['title'] = $position['title'];
-                $data['description'] = $position['company_name'] . ' · ' . ($position['location'] ?: 'Chưa cập nhật địa điểm');
+                $data['description'] = $position['company_name'] . ' · ' . $position['location'];
                 $data['metrics'] = [
                     ['label' => 'Số lượng', 'value' => (string) $position['quantity'], 'note' => 'Vị trí đang tuyển'],
                     ['label' => 'Hạn ứng tuyển', 'value' => page_date($position['deadline']), 'note' => 'Kiểm tra trước khi nộp hồ sơ'],
@@ -240,10 +321,12 @@ function load_screen_data(string $screen, array $data, array $user): array
                 $data['position_id'] = (int) $position['id'];
                 $data['application_status'] = $position['application_status'];
                 $data['fields'] = [
+                    ['label' => 'Công ty tuyển dụng', 'value' => $position['company_name']],
+                    ['label' => 'Địa chỉ công ty', 'value' => $position['company_address']],
                     ['label' => 'Mô tả', 'value' => $position['description'] ?: 'Doanh nghiệp chưa bổ sung mô tả.'],
                     ['label' => 'Yêu cầu', 'value' => $position['requirements'] ?: 'Doanh nghiệp chưa bổ sung yêu cầu.'],
                     ['label' => 'Quyền lợi', 'value' => $position['benefits'] ?: 'Trao đổi trực tiếp với doanh nghiệp.'],
-                    ['label' => 'Địa điểm', 'value' => $position['location'] ?: $position['company_address']],
+                    ['label' => 'Địa điểm làm việc', 'value' => $position['location'] ?: 'Tại văn phòng công ty'],
                 ];
             }
             break;
@@ -302,7 +385,7 @@ function load_screen_data(string $screen, array $data, array $user): array
             $parameters = $screen === 'company/positions' ? [$companyId] : [];
             $filter = $screen === 'company/positions' ? 'WHERE p.company_id = ?' : '';
             $positions = page_all(
-                'SELECT p.id, p.title, c.company_name, p.quantity, p.deadline, p.status, COUNT(a.id) AS applicant_count FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id ' . $filter . ' GROUP BY p.id ORDER BY p.created_at DESC',
+                'SELECT p.id, p.title, p.description, p.requirements, p.benefits, p.location, c.company_name, c.address AS company_address, p.quantity, p.deadline, p.status, COUNT(a.id) AS applicant_count FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id ' . $filter . ' GROUP BY p.id ORDER BY p.created_at DESC',
                 $parameters
             );
             if ($screen === 'company/positions') {
@@ -310,7 +393,13 @@ function load_screen_data(string $screen, array $data, array $user): array
                     'id' => (int) $row['id'],
                     'title' => $row['title'],
                     'meta' => $row['quantity'] . ' vị trí · Hạn ' . page_date($row['deadline']),
-                    'description' => $row['applicant_count'] . ' hồ sơ · ' . $row['company_name'],
+                    'description' => 'Công ty: ' . $row['company_name'] . ' · Địa chỉ: ' . ($row['company_address'] ?: 'Chưa cập nhật') . ' · ' . $row['applicant_count'] . ' hồ sơ',
+                    'position_description' => (string) ($row['description'] ?? ''),
+                    'requirements' => (string) ($row['requirements'] ?? ''),
+                    'benefits' => (string) ($row['benefits'] ?? ''),
+                    'location' => (string) ($row['location'] ?? ''),
+                    'quantity' => (int) $row['quantity'],
+                    'deadline' => (string) ($row['deadline'] ?? ''),
                     'tag' => page_status_label($row['status'], $positionLabels),
                     'status' => $row['status'],
                 ], $positions);
@@ -320,7 +409,8 @@ function load_screen_data(string $screen, array $data, array $user): array
                     ['label' => 'Hồ sơ ứng tuyển', 'value' => (string) array_sum(array_column($positions, 'applicant_count')), 'note' => 'Trên các vị trí của doanh nghiệp'],
                 ];
             } else {
-                $data['rows'] = array_map(static fn($row) => [$row['title'], $row['company_name'], (string) $row['quantity'], page_status_label($row['status'], $positionLabels)], $positions);
+                $data['columns'] = ['Vị trí', 'Doanh nghiệp', 'Số lượng', 'Địa chỉ công ty', 'Trạng thái'];
+                $data['rows'] = array_map(static fn($row) => [$row['title'], $row['company_name'], (string) $row['quantity'], $row['company_address'] ?: 'Chưa cập nhật', page_status_label($row['status'], $positionLabels)], $positions);
                 $data['row_ids'] = array_column($positions, 'id');
                 $data['metrics'] = [
                     ['label' => 'Đang mở', 'value' => (string) count(array_filter($positions, static fn($row) => $row['status'] === 'open')), 'note' => 'Đang nhận hồ sơ'],

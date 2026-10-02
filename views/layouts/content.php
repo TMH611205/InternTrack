@@ -160,7 +160,7 @@ $primaryAction = $primaryActions[$screen] ?? null;
                                     <?php elseif ($screen === 'admin/users' && $recordId && (int) $recordId !== (int) $user['id']): ?>
                                         <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="user_status"><input type="hidden" name="user_id" value="<?= (int) $recordId ?>"><input type="hidden" name="status" value="<?= $row[3] === 'Hoạt động' ? 'inactive' : 'active' ?>"><button type="submit"><?= $row[3] === 'Hoạt động' ? 'Tạm khóa' : 'Kích hoạt' ?></button></form>
                                     <?php elseif ($screen === 'admin/positions' && $recordId): ?>
-                                        <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="position_status"><input type="hidden" name="position_id" value="<?= (int) $recordId ?>"><input type="hidden" name="status" value="<?= $row[3] === 'Đang mở' ? 'closed' : 'open' ?>"><button type="submit"><?= $row[3] === 'Đang mở' ? 'Đóng tin' : 'Mở tin' ?></button></form>
+                                        <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="position_status"><input type="hidden" name="position_id" value="<?= (int) $recordId ?>"><input type="hidden" name="status" value="<?= $row[4] === 'Đang mở' ? 'closed' : 'open' ?>"><button type="submit"><?= $row[4] === 'Đang mở' ? 'Đóng tin' : 'Mở tin' ?></button></form>
                                     <?php elseif ($screen === 'admin/internship' && $recordId): ?>
                                         <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="internship_update"><input type="hidden" name="internship_id" value="<?= (int) $recordId ?>"><select name="status" aria-label="Trạng thái kỳ thực tập">
                                                 <option value="planned" <?= $row[3] === 'Sắp bắt đầu' ? 'selected' : '' ?>>Chưa bắt đầu</option>
@@ -177,7 +177,7 @@ $primaryAction = $primaryActions[$screen] ?? null;
                     </tbody>
                 </table>
             </div>
-            <div class="table-foot"><span><?= count($screenData['rows']) ?> mục · Theo dữ liệu hiện tại</span></div>
+            <div class="table-foot"><span data-table-count data-total="<?= count($screenData['rows']) ?>"><?= count($screenData['rows']) ?> mục · Theo dữ liệu hiện tại</span></div>
         </section>
 
     <?php elseif ($kind === 'kanban'): ?>
@@ -213,24 +213,69 @@ $primaryAction = $primaryActions[$screen] ?? null;
         </section>
 
     <?php elseif ($kind === 'cards' || $kind === 'reports'): ?>
-        <section class="content-card-grid <?= $kind === 'reports' ? 'content-card-grid--reports' : '' ?>">
-            <?php foreach ($screenData['cards'] as $card): ?><article class="opportunity-card">
+        <?php if ($screen === 'student/internships'): ?>
+            <div class="opportunity-toolbar">
+                <label class="search-field"><span aria-hidden="true">⌕</span><input type="search" data-opportunity-search placeholder="Tìm vị trí, kỹ năng hoặc doanh nghiệp" aria-label="Tìm cơ hội thực tập"></label>
+                <div class="opportunity-sort">
+                    <span class="opportunity-sort-label">Sắp xếp theo</span>
+                    <div class="opportunity-sort-options" role="group" aria-label="Sắp xếp cơ hội">
+                        <button type="button" class="opportunity-sort-option is-selected" data-sort-mode="match" aria-pressed="true">Độ phù hợp</button>
+                        <button type="button" class="opportunity-sort-option" data-sort-mode="deadline" aria-pressed="false">Hạn nộp</button>
+                    </div>
+                </div>
+                <span class="opportunity-count" data-opportunity-count aria-live="polite"></span>
+            </div>
+        <?php endif; ?>
+        <section class="content-card-grid <?= $kind === 'reports' ? 'content-card-grid--reports' : '' ?>" <?= $screen === 'student/internships' ? 'data-opportunity-list' : '' ?>>
+            <?php foreach ($screenData['cards'] as $card): ?>
+                <?php $isOpportunity = $screen === 'student/internships'; ?>
+                <article class="opportunity-card" <?= $isOpportunity ? 'data-opportunity-card data-match-score="' . (int) ($card['match_score'] ?? 0) . '" data-deadline="' . screen_escape($card['deadline'] ?? '') . '"' : '' ?>>
                     <div class="card-topline"><span class="card-mark" aria-hidden="true"></span><span class="badge <?= screen_badge_class($card['tag']) ?>"><?= screen_escape($card['tag']) ?></span></div>
                     <h2><?= screen_escape($card['title']) ?></h2>
-                    <p class="card-meta"><?= screen_escape($card['meta']) ?></p>
+                    <?php if ($isOpportunity): ?>
+                        <div class="card-meta opportunity-company-details">
+                            <strong><?= screen_escape($card['company_name']) ?></strong>
+                            <span>Địa chỉ công ty: <?= screen_escape($card['company_address']) ?></span>
+                            <span>Địa điểm làm việc: <?= screen_escape($card['work_location']) ?></span>
+                        </div>
+                    <?php else: ?>
+                        <p class="card-meta"><?= screen_escape($card['meta']) ?></p>
+                    <?php endif; ?>
                     <p><?= screen_escape($card['description']) ?></p>
                     <?php if ($screen === 'student/internships'): ?>
                         <a href="?page=student/internship-detail&amp;id=<?= (int) ($card['id'] ?? 0) ?>" class="text-link">Xem chi tiết<span aria-hidden="true"> ↗</span></a>
                     <?php elseif ($screen === 'company/positions' && !empty($card['id'])): ?>
                         <form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="position_status"><input type="hidden" name="position_id" value="<?= (int) $card['id'] ?>"><input type="hidden" name="status" value="<?= $card['status'] === 'open' ? 'closed' : 'open' ?>"><button type="submit"><?= $card['status'] === 'open' ? 'Đóng nhận hồ sơ' : 'Mở lại vị trí' ?></button></form>
+                        <details class="action-panel position-edit-panel">
+                            <summary><span>Chỉnh sửa tin</span><small>Bổ sung nơi làm việc nếu còn thiếu</small></summary>
+                            <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form">
+                                <?= $csrfField ?><input type="hidden" name="action" value="position_save"><input type="hidden" name="position_id" value="<?= (int) $card['id'] ?>">
+                                <label>Tên vị trí<input name="title" maxlength="200" value="<?= screen_escape($card['title']) ?>" required></label>
+                                <label>Mô tả công việc<textarea name="description" rows="3" required><?= screen_escape($card['position_description']) ?></textarea></label>
+                                <label>Yêu cầu<textarea name="requirements" rows="2"><?= screen_escape($card['requirements']) ?></textarea></label>
+                                <label>Quyền lợi<textarea name="benefits" rows="2"><?= screen_escape($card['benefits']) ?></textarea></label>
+                                <div class="form-grid"><label>Nơi làm việc<input name="location" maxlength="255" placeholder="TP. Vinh, Nghệ An hoặc Từ xa" value="<?= screen_escape($card['location']) ?>"></label><label>Số lượng<input name="quantity" type="number" min="1" value="<?= (int) $card['quantity'] ?>" required></label><label>Hạn nhận hồ sơ<input name="deadline" type="date" value="<?= screen_escape($card['deadline']) ?>"></label><label>Trạng thái<select name="status">
+                                            <option value="draft" <?= $card['status'] === 'draft' ? 'selected' : '' ?>>Bản nháp</option>
+                                            <option value="open" <?= $card['status'] === 'open' ? 'selected' : '' ?>>Đang mở</option>
+                                            <option value="closed" <?= $card['status'] === 'closed' ? 'selected' : '' ?>>Đã đóng</option>
+                                            <option value="cancelled" <?= $card['status'] === 'cancelled' ? 'selected' : '' ?>>Đã hủy</option>
+                                        </select></label></div>
+                                <button class="button button--primary" type="submit">Lưu tin tuyển dụng</button>
+                            </form>
+                        </details>
                     <?php elseif ($kind === 'reports' && !empty($card['id'])): ?>
                         <?php if (!empty($card['file_path'])): ?><a href="?download=report&amp;id=<?= (int) $card['id'] ?>" class="text-link">Tải báo cáo<span aria-hidden="true"> ↓</span></a><?php else: ?><span class="text-link">Chưa có tệp đính kèm</span><?php endif; ?>
                         <?php if ($screen === 'lecturer/reports'): ?><form method="post" action="<?= screen_escape($formAction) ?>" class="review-card-form"><?= $csrfField ?><input type="hidden" name="action" value="report_review"><input type="hidden" name="report_id" value="<?= (int) $card['id'] ?>"><textarea name="feedback" rows="2" maxlength="5000" placeholder="Nhận xét cho sinh viên"></textarea>
                                 <div class="review-actions"><button name="status" value="approved" type="submit">Duyệt</button><button name="status" value="rejected" type="submit">Yêu cầu sửa</button></div>
                             </form><?php endif; ?>
                     <?php else: ?><span class="text-link">Xem chi tiết</span><?php endif; ?>
-                </article><?php endforeach; ?>
+                </article>
+            <?php endforeach; ?>
         </section>
+        <?php if ($screen === 'student/internships'): ?>
+            <?php if (!$screenData['cards']): ?><p class="opportunity-empty">Hiện chưa có vị trí phù hợp đang mở.</p><?php endif; ?>
+            <p class="opportunity-empty" data-opportunity-empty hidden>Không tìm thấy cơ hội khớp với nội dung tìm kiếm.</p>
+        <?php endif; ?>
 
     <?php elseif ($kind === 'profile'): ?>
         <section class="profile-layout">

@@ -34,6 +34,7 @@ $pageDescription = (string) ($screenData['description'] ?? 'Hệ thống quản 
     <meta property="og:site_name" content="InternTrack">
     <meta name="twitter:card" content="summary_large_image">
     <title><?= screen_escape($pageTitle) ?> · InternTrack</title>
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
     <link rel="canonical" href="https://interntrack.local/">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

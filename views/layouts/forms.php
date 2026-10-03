@@ -124,20 +124,17 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
             <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu hồ sơ</button></div>
         </form>
     </dialog>
-<?php elseif (in_array($screen, ['company/evaluations', 'lecturer/evaluations'], true) && !empty($screenData['internship_options'])): ?>
-    <button type="button" class="action-trigger" data-dialog-open="form-modal-8"><span>+ Tạo đánh giá</span><small>Chấm điểm bốn tiêu chí và gửi nhận xét</small></button>
-    <dialog class="modal" id="form-modal-8" aria-label="Tạo đánh giá">
-        <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
-                <header class="modal-head"><div><p class="eyebrow">Chấm điểm bốn tiêu chí và gửi nhận xét</p><h2>Tạo đánh giá</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
-            <?= $csrfField ?><input type="hidden" name="action" value="evaluation_save">
-            <label>Kỳ thực tập<select name="internship_id" required><?php foreach ($screenData['internship_options'] as $option): ?><option value="<?= (int) $option['id'] ?>"><?= screen_escape($option['full_name'] . ' · ' . $option['title']) ?></option><?php endforeach; ?></select></label>
-            <div class="form-grid"><label>Chuyên môn<input name="technical_score" type="number" min="0" max="100" value="80" required></label><label>Thái độ<input name="attitude_score" type="number" min="0" max="100" value="80" required></label><label>Giao tiếp<input name="communication_score" type="number" min="0" max="100" value="80" required></label><label>Kỷ luật<input name="discipline_score" type="number" min="0" max="100" value="80" required></label></div>
-            <label>Nhận xét<textarea name="comments" rows="3" maxlength="5000"></textarea></label>
-            <label>Trạng thái<select name="status">
-                    <option value="submitted">Gửi đánh giá</option>
-                    <option value="draft">Lưu bản nháp</option>
-                </select></label>
-            <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu đánh giá</button></div>
+<?php elseif ($screen === 'admin/documents'): ?>
+    <button type="button" class="action-trigger" data-dialog-open="form-modal-kb"><span>+ Thêm tài liệu</span><small>Quy định, mốc thời gian, biểu mẫu thực tập</small></button>
+    <dialog class="modal" id="form-modal-kb" aria-label="Thêm tài liệu">
+        <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
+            <header class="modal-head"><div><p class="eyebrow">Nguồn cho trợ lý hỏi đáp</p><h2>Thêm tài liệu</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
+            <?= $csrfField ?><input type="hidden" name="action" value="kb_save">
+            <label>Tiêu đề<input name="title" maxlength="200" placeholder="Ví dụ: Quy định thực tập 2026"></label>
+            <label>Nội dung<textarea name="content" rows="10" maxlength="60000" placeholder="Dán nội dung quy định, mốc thời gian, hướng dẫn biểu mẫu..."></textarea></label>
+            <label>Hoặc tải tệp văn bản (.txt, .md · UTF-8 · tối đa 300 KB)<input name="kb_file" type="file" accept=".txt,.md,text/plain,text/markdown"></label>
+            <p class="form-hint">Hãy dán nguyên văn nội dung quan trọng (mốc nộp báo cáo, điều kiện, số tín chỉ...). AI chỉ trả lời dựa trên các tài liệu này.</p>
+            <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu tài liệu</button></div>
         </form>
     </dialog>
 <?php elseif ($screen === 'admin/users' && ($screenData['group'] ?? 'student') !== 'admin'): ?>

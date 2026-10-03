@@ -54,6 +54,7 @@ $notificationRecent = $notificationTotal > 0 ? notification_unread((int) $user['
 $sectionKey = (string) ($screenData['active'] ?? '');
 $sectionNotices = ($sectionKey !== '' && ($notificationCounts[$sectionKey] ?? 0) > 0) ? notification_unread((int) $user['id'], $sectionKey, 10) : [];
 
+require_once __DIR__ . '/ai-insight.php';
 require __DIR__ . '/header.php';
 require __DIR__ . '/content.php';
 require __DIR__ . '/footer.php';

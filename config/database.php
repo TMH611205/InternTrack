@@ -35,3 +35,20 @@ function database(): PDO
 
     return $connection;
 }
+
+// Chạy $work trong một giao dịch: thành công thì commit, có lỗi thì rollback rồi ném lại lỗi.
+function database_transaction(callable $work): mixed
+{
+    $connection = database();
+    $connection->beginTransaction();
+    try {
+        $result = $work($connection);
+        $connection->commit();
+        return $result;
+    } catch (Throwable $error) {
+        if ($connection->inTransaction()) {
+            $connection->rollBack();
+        }
+        throw $error;
+    }
+}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 146" role="img" aria-label="InternTrack">
+  <rect x="12" y="12" width="128" height="122" rx="44" fill="none" stroke="#166534" stroke-width="24"/>
+  <rect x="100" y="12" width="128" height="122" rx="44" fill="none" stroke="#4caf50" stroke-width="24"/>
+  <circle cx="120" cy="73" r="16" fill="#f59e0b"/>
+</svg>

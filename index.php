@@ -26,6 +26,7 @@ $availablePages = [
     'admin/dashboard',
     'admin/profile',
     'admin/companies',
+    'admin/documents',
     'admin/internship',
     'admin/positions',
     'admin/students',
@@ -36,6 +37,7 @@ $availablePages = [
     'company/inters',
     'company/positions',
     'company/profile',
+    'company/skills',
     'company/tasks',
     'lecturer/dashboard',
     'lecturer/profile',
@@ -69,6 +71,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+
+    // Bong bóng chat AI gọi bằng fetch và nhận JSON, không chuyển hướng trang.
+    if ($action === 'ai_chat') {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $chatUser = authenticated_user();
+            if ($chatUser === null || $chatUser['role'] !== 'student') {
+                http_response_code(403);
+                exit(json_encode(['error' => 'Chỉ sinh viên đăng nhập mới dùng được trợ lý AI.'], JSON_UNESCAPED_UNICODE));
+            }
+            require_once __DIR__ . '/controllers/PageController.php';
+            $history = json_decode(is_string($_POST['history'] ?? null) ? $_POST['history'] : '[]', true);
+            $reply = ai_chat_reply($chatUser, is_array($history) ? $history : [], is_string($_POST['message'] ?? null) ? $_POST['message'] : '');
+            exit(json_encode(['reply' => $reply], JSON_UNESCAPED_UNICODE));
+        } catch (DomainException $error) {
+            http_response_code(422);
+            exit(json_encode(['error' => $error->getMessage()], JSON_UNESCAPED_UNICODE));
+        } catch (Throwable $error) {
+            error_log('InternTrack AI chat: ' . $error->getMessage());
+            http_response_code(500);
+            exit(json_encode(['error' => 'Đã có lỗi xảy ra. Vui lòng thử lại.'], JSON_UNESCAPED_UNICODE));
+        }
+    }
+
     try {
         if ($action === 'login') {
             $identifier = is_string($_POST['login'] ?? null) ? $_POST['login'] : '';

@@ -39,6 +39,235 @@
     if (event.key === "Escape") closeSidebar();
   });
 
+  const boardFilter = document.querySelector("[data-board-filter]");
+  if (boardFilter) {
+    const boardSearch = boardFilter.querySelector("[data-board-search]");
+    const boardStudent = boardFilter.querySelector("[data-board-student]");
+    const boardAttention = boardFilter.querySelector("[data-board-attention]");
+    const boardCount = boardFilter.querySelector("[data-board-count]");
+    const cards = [...document.querySelectorAll(".task-card")];
+    const applyBoardFilter = () => {
+      const query = normalizeSearch(boardSearch.value);
+      let total = 0;
+      cards.forEach((card) => {
+        const visible =
+          (!boardStudent.value ||
+            card.dataset.taskStudent === boardStudent.value) &&
+          (!boardAttention.checked ||
+            card.dataset.taskStatus === "submitted") &&
+          normalizeSearch(card.textContent).includes(query);
+        card.hidden = !visible;
+        if (visible) total += 1;
+      });
+      document.querySelectorAll(".board-column").forEach((column) => {
+        const visible = column.querySelectorAll(
+          ".task-card:not([hidden])",
+        ).length;
+        const badge = column.querySelector(".board-heading span");
+        if (badge) badge.textContent = visible;
+        const empty = column.querySelector("[data-board-empty]");
+        if (empty) empty.hidden = visible > 0;
+      });
+      boardCount.textContent = `${total} / ${cards.length} nhiệm vụ`;
+    };
+    [boardSearch, boardStudent, boardAttention].forEach((control) =>
+      control.addEventListener(
+        control === boardSearch ? "input" : "change",
+        applyBoardFilter,
+      ),
+    );
+    applyBoardFilter();
+  }
+
+  document.querySelectorAll("[data-major-filter]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const search = document.querySelector("[data-table-search]");
+      if (!search) return;
+      search.value = button.dataset.majorFilter;
+      search.dispatchEvent(new Event("input"));
+      search.scrollIntoView({ behavior: "smooth", block: "center" });
+    }),
+  );
+
+  const majorSearch = document.querySelector("[data-major-search]");
+  if (majorSearch) {
+    const majorRows = [
+      ...document.querySelectorAll("[data-major-list] .major-row"),
+    ];
+    const majorEmpty = document.querySelector("[data-major-empty]");
+    majorSearch.addEventListener("input", () => {
+      const query = normalizeSearch(majorSearch.value);
+      let visibleCount = 0;
+      majorRows.forEach((row) => {
+        const visible = normalizeSearch(
+          row.querySelector(".major-row-info strong").textContent,
+        ).includes(query);
+        row.hidden = !visible;
+        if (visible) visibleCount += 1;
+      });
+      if (majorEmpty) majorEmpty.hidden = visibleCount > 0;
+    });
+  }
+
+  document.querySelectorAll("[data-ai-match-form]").forEach((form) =>
+    form.addEventListener("submit", () => {
+      const button = form.querySelector("[data-ai-match-button]");
+      if (button) {
+        button.disabled = true;
+        button.textContent = "AI đang đọc CV… (có thể mất vài chục giây)";
+      }
+    }),
+  );
+
+  document.addEventListener("submit", (event) => {
+    const button = event.target.querySelector?.("[data-ai-submit]");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "AI đang phân tích… (có thể mất vài chục giây)";
+    }
+  });
+
+  const aiChat = document.querySelector("[data-ai-chat]");
+  if (aiChat) {
+    const panel = aiChat.querySelector("[data-ai-chat-panel]");
+    const toggle = aiChat.querySelector("[data-ai-chat-toggle]");
+    const log = aiChat.querySelector("[data-ai-chat-log]");
+    const form = aiChat.querySelector("[data-ai-chat-form]");
+    const input = form.querySelector("input");
+    const suggest = aiChat.querySelector("[data-ai-chat-suggest]");
+    const storeKey = "interntrack-ai-chat";
+    let history = [];
+    try {
+      history = JSON.parse(sessionStorage.getItem(storeKey) || "[]");
+    } catch (error) {
+      history = [];
+    }
+
+    const escapeHtml = (text) =>
+      text.replace(
+        /[&<>"']/g,
+        (char) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          })[char],
+      );
+    // [[id|tên vị trí]] -> liên kết tới trang chi tiết; nội dung được escape trước khi chèn.
+    const renderMessage = (text) =>
+      escapeHtml(text)
+        .replace(
+          /\[\[(\d+)\|([^\]]+)\]\]/g,
+          '<a href="?page=student/internship-detail&amp;id=$1">$2</a>',
+        )
+        .replace(/\n/g, "<br>");
+    const addBubble = (role, text) => {
+      const isUser = role === "user";
+      const row = document.createElement("div");
+      row.className = `ai-chat-row ai-chat-row--${isUser ? "user" : "bot"}`;
+      if (!isUser) {
+        const avatar = document.createElement("span");
+        avatar.className = "ai-chat-avatar";
+        avatar.innerHTML =
+          '<img src="assets/images/logo-mark.svg" alt="" width="16" height="10">';
+        row.appendChild(avatar);
+      }
+      const bubble = document.createElement("div");
+      bubble.className = `ai-chat-msg ai-chat-msg--${isUser ? "user" : "bot"}`;
+      if (isUser) bubble.textContent = text;
+      else bubble.innerHTML = renderMessage(text);
+      row.appendChild(bubble);
+      log.appendChild(row);
+      log.scrollTop = log.scrollHeight;
+      return bubble;
+    };
+    const save = () => {
+      try {
+        sessionStorage.setItem(storeKey, JSON.stringify(history.slice(-16)));
+      } catch (error) {
+        /* bỏ qua nếu trình duyệt chặn lưu trữ */
+      }
+    };
+    const setOpen = (open) => {
+      panel.hidden = !open;
+      aiChat.classList.toggle("is-open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) input.focus();
+    };
+
+    if (history.length) {
+      history.forEach((turn) => addBubble(turn.role, turn.text));
+      suggest.hidden = true;
+    } else {
+      addBubble(
+        "model",
+        "Xin chào! Mình đã có thể xem CV và hồ sơ của bạn. Bạn muốn mình gợi ý vị trí thực tập nào phù hợp?",
+      );
+    }
+
+    toggle.addEventListener("click", () => setOpen(panel.hidden));
+    aiChat
+      .querySelector("[data-ai-chat-close]")
+      .addEventListener("click", () => setOpen(false));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) setOpen(false);
+    });
+    suggest.querySelectorAll("button").forEach((button) =>
+      button.addEventListener("click", () => {
+        input.value = button.textContent;
+        form.requestSubmit();
+      }),
+    );
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const message = input.value.trim();
+      if (!message) return;
+      input.value = "";
+      suggest.hidden = true;
+      addBubble("user", message);
+      const pending = addBubble("model", "");
+      pending.innerHTML =
+        '<span class="ai-typing" aria-label="Đang trả lời"><i></i><i></i><i></i></span>';
+      pending.classList.add("is-pending");
+      form.querySelector("button").disabled = true;
+      try {
+        const body = new URLSearchParams({
+          action: "ai_chat",
+          _csrf: aiChat.dataset.csrf,
+          message,
+          history: JSON.stringify(history.slice(-8)),
+        });
+        const response = await fetch(aiChat.dataset.endpoint, {
+          method: "POST",
+          body,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.reply)
+          throw new Error(
+            data.error || "Không nhận được phản hồi. Vui lòng thử lại.",
+          );
+        pending.classList.remove("is-pending");
+        pending.innerHTML = renderMessage(data.reply);
+        history.push(
+          { role: "user", text: message },
+          { role: "model", text: data.reply },
+        );
+        save();
+      } catch (error) {
+        pending.classList.remove("is-pending");
+        pending.classList.add("is-error");
+        pending.textContent = error.message;
+      } finally {
+        form.querySelector("button").disabled = false;
+        log.scrollTop = log.scrollHeight;
+        input.focus();
+      }
+    });
+  }
+
   const tableSearch = document.querySelector("[data-table-search]");
   const tableBody = document.querySelector("[data-table-body]");
   if (tableSearch && tableBody) {
@@ -271,14 +500,19 @@
     const target = document.getElementById(decodeURIComponent(hash.slice(1)));
     if (!target) return false;
     if (target.tagName === "DIALOG") {
-      if (typeof target.showModal === "function" && !target.open) target.showModal();
-      target.querySelector("input:not([type=hidden]), textarea, select")?.focus();
+      if (typeof target.showModal === "function" && !target.open)
+        target.showModal();
+      target
+        .querySelector("input:not([type=hidden]), textarea, select")
+        ?.focus();
       return true;
     }
     if (target.tagName !== "DETAILS") return false;
     target.open = true;
     target.scrollIntoView({ behavior: "smooth", block: "start" });
-    target.querySelector("input:not([type=hidden]), textarea, select")?.focus({ preventScroll: true });
+    target
+      .querySelector("input:not([type=hidden]), textarea, select")
+      ?.focus({ preventScroll: true });
     return true;
   };
   document.addEventListener("click", (event) => {
@@ -332,7 +566,9 @@
       const dialog = document.getElementById(opener.dataset.dialogOpen);
       if (dialog && typeof dialog.showModal === "function") {
         dialog.showModal();
-        dialog.querySelector("input:not([type=hidden]), textarea, select")?.focus();
+        dialog
+          .querySelector("input:not([type=hidden]), textarea, select")
+          ?.focus();
       }
       return;
     }
@@ -341,6 +577,7 @@
       return;
     }
     // Bấm vào vùng nền tối (chính là phần tử dialog) thì đóng.
-    if (event.target instanceof HTMLDialogElement && event.target.open) event.target.close();
+    if (event.target instanceof HTMLDialogElement && event.target.open)
+      event.target.close();
   });
 })();

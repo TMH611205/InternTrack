@@ -708,6 +708,95 @@ INSERT IGNORE INTO users (
     'active'
 );
 
+
+
+-- ============================================================
+-- Gợi ý ghép sinh viên - vị trí thực tập bằng AI (đọc CV)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ai_matches (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    student_id BIGINT UNSIGNED NOT NULL,
+    position_id BIGINT UNSIGNED NOT NULL,
+    score TINYINT UNSIGNED NOT NULL,
+    reason VARCHAR(500) NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_ai_matches UNIQUE (student_id, position_id),
+
+    CONSTRAINT fk_ai_matches_student
+        FOREIGN KEY (student_id) REFERENCES students(id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    CONSTRAINT fk_ai_matches_position
+        FOREIGN KEY (position_id) REFERENCES positions(id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    INDEX idx_ai_matches_student_score (student_id, score)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Kết quả phân tích của AI (tóm tắt nhật ký/báo cáo, cảnh báo rủi ro, nhận xét cuối kỳ, thống kê kỹ năng)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ai_insights (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    kind VARCHAR(30) NOT NULL,
+    subject_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    payload MEDIUMTEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_ai_insights UNIQUE (kind, subject_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Tài liệu của khoa (quy định, mốc thời gian, biểu mẫu) làm nguồn cho trợ lý hỏi đáp
+-- ============================================================
+CREATE TABLE IF NOT EXISTS kb_documents (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    content MEDIUMTEXT NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_kb_documents_user
+        FOREIGN KEY (created_by) REFERENCES users(id)
+        ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Kỹ năng AI đề xuất từ nhật ký tuần, chờ người hướng dẫn ở doanh nghiệp xác nhận / sửa / bác bỏ
+-- ============================================================
+CREATE TABLE IF NOT EXISTS skill_suggestions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    diary_id BIGINT UNSIGNED NOT NULL,
+    internship_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    skill_type ENUM('chuyen_mon', 'lam_viec') NOT NULL,
+    evidence TEXT NOT NULL,
+    level ENUM('moi_lam_quen', 'can_huong_dan', 'tu_lam_co_ho_tro', 'tu_lam_doc_lap') NOT NULL,
+    existed_before TINYINT(1) NOT NULL DEFAULT 0,
+    status ENUM('pending', 'confirmed', 'edited', 'rejected') NOT NULL DEFAULT 'pending',
+    reviewed_by BIGINT UNSIGNED NULL,
+    reviewed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_skill_suggestions_diary
+        FOREIGN KEY (diary_id) REFERENCES diaries(id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    CONSTRAINT fk_skill_suggestions_internship
+        FOREIGN KEY (internship_id) REFERENCES internships(id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+
+    CONSTRAINT fk_skill_suggestions_reviewer
+        FOREIGN KEY (reviewed_by) REFERENCES users(id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+
+    INDEX idx_skill_suggestions_diary (diary_id, status),
+    INDEX idx_skill_suggestions_internship (internship_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 -- END
 -- ============================================================

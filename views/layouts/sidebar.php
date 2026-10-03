@@ -23,6 +23,7 @@ $navigation = [
         ['key' => 'interns', 'label' => 'Thực tập sinh', 'page' => 'company/inters', 'icon' => 'users'],
         ['key' => 'positions', 'label' => 'Vị trí tuyển', 'page' => 'company/positions', 'icon' => 'pin'],
         ['key' => 'tasks', 'label' => 'Nhiệm vụ', 'page' => 'company/tasks', 'icon' => 'check'],
+        ['key' => 'skills', 'label' => 'Kỹ năng thực tập', 'page' => 'company/skills', 'icon' => 'chart'],
         ['key' => 'evaluations', 'label' => 'Đánh giá', 'page' => 'company/evaluations', 'icon' => 'star'],
         ['key' => 'profile', 'label' => 'Hồ sơ doanh nghiệp', 'page' => 'company/profile', 'icon' => 'building'],
     ],
@@ -41,6 +42,7 @@ $navigation = [
         ['key' => 'companies', 'label' => 'Doanh nghiệp', 'page' => 'admin/companies', 'icon' => 'building'],
         ['key' => 'positions', 'label' => 'Vị trí thực tập', 'page' => 'admin/positions', 'icon' => 'pin'],
         ['key' => 'internships', 'label' => 'Kỳ thực tập', 'page' => 'admin/internship', 'icon' => 'calendar'],
+        ['key' => 'documents', 'label' => 'Tài liệu khoa', 'page' => 'admin/documents', 'icon' => 'book'],
         ['key' => 'users', 'label' => 'Tài khoản', 'page' => 'admin/users', 'icon' => 'users'],
         ['key' => 'profile', 'label' => 'Hồ sơ cá nhân', 'page' => 'admin/profile', 'icon' => 'user'],
     ],
@@ -52,7 +54,7 @@ $accountPage = ['student' => 'student/profile', 'company' => 'company/profile', 
 <!-- Sidebar là trung tâm điều hướng của ứng dụng, hiển thị menu theo vai trò và nút đăng xuất -->
 <aside class="sidebar" id="app-sidebar">
     <a class="brand" href="?page=<?= screen_escape($role) ?>/dashboard" aria-label="InternTrack, về tổng quan">
-        <span class="brand-symbol">it<span>.</span></span><span class="brand-name">intern<span>track</span></span>
+        <img class="brand-mark" src="assets/images/logo-mark.svg" alt="" width="40" height="24"><span class="brand-name">Intern<span>Track</span></span>
     </a>
     <div class="workspace-switcher"><span class="workspace-glyph"><?= screen_escape(screen_initial($roleNames[$role])) ?></span><span><small>KHÔNG GIAN</small><strong><?= screen_escape($roleNames[$role]) ?></strong></span><span class="switcher-arrow"><?= ui_icon('chevron-down') ?></span></div>
     <p class="nav-label">MENU CHÍNH</p>

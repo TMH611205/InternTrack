@@ -29,6 +29,7 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
     <meta property="og:description" content="<?= $authEscape($authPageDescription) ?>">
     <meta property="og:type" content="website">
     <title><?= $authEscape($authPageTitle) ?> · InternTrack</title>
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
     <link rel="canonical" href="https://interntrack.local/">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -39,7 +40,7 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
 <body class="auth-body">
     <main class="auth-layout">
         <section class="auth-aside">
-            <a class="brand brand--light" href="?page=auth/login"><span class="brand-symbol">it<span>.</span></span><span class="brand-name">intern<span>track</span></span></a>
+            <a class="brand brand--light" href="?page=auth/login"><img class="brand-mark" src="assets/images/logo-mark-light.svg" alt="" width="40" height="24"><span class="brand-name">Intern<span>Track</span></span></a>
             <div class="auth-aside-copy">
                 <p class="eyebrow">KẾT NỐI HỌC TẬP VỚI THỰC TIỄN</p>
                 <p class="auth-issue">Từ giảng đường<br>đến <em>nghề nghiệp.</em></p>
@@ -50,7 +51,7 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
         </section>
         <section class="auth-main">
             <div class="auth-form-wrap">
-                <a class="brand auth-main-brand" href="?page=auth/login" aria-label="InternTrack, về đăng nhập"><span class="brand-symbol">it<span>.</span></span><span class="brand-name">intern<span>track</span></span></a>
+                <a class="brand auth-main-brand" href="?page=auth/login" aria-label="InternTrack, về đăng nhập"><img class="brand-mark" src="assets/images/logo-mark.svg" alt="" width="40" height="24"><span class="brand-name">Intern<span>Track</span></span></a>
                 <a class="auth-back" href="?page=auth/login"><span class="auth-back-arrow" aria-hidden="true">←</span><span><?= $isReset ? 'Quay lại đăng nhập' : ($isForgot ? 'Quay lại đăng nhập' : 'Cổng thực tập') ?></span></a>
                 <p class="eyebrow"><?= $isReset ? ($isPasswordStep ? 'MẬT KHẨU MỚI' : 'XÁC MINH EMAIL') : ($isForgot ? 'KHÔI PHỤC TÀI KHOẢN' : 'CHÀO MỪNG TRỞ LẠI') ?></p>
                 <h1><?= $isReset ? ($isPasswordStep ? 'Tạo mật khẩu mới.' : 'Xác minh mã OTP.') : ($isForgot ? 'Lấy lại quyền truy cập.' : 'Đăng nhập để tiếp tục.') ?></h1>

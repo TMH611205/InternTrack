@@ -48,7 +48,30 @@ $pageDescription = (string) ($screenData['description'] ?? 'Hệ thống quản 
             <header class="topbar">
                 <button class="mobile-menu-button" type="button" aria-label="Mở menu" aria-controls="app-sidebar" data-sidebar-toggle><span></span><span></span></button>
                 <div class="breadcrumb"><span>InternTrack</span><span class="breadcrumb-slash">/</span><strong><?= screen_escape($screenData['title']) ?></strong></div>
-                <div class="topbar-actions"><span class="term-chip">HỌC KỲ 1 <span>·</span> 2026</span><button class="notification-button" type="button" aria-label="Thông báo" data-toast="Không có thông báo mới."><span class="notification-glyph">!</span></button><span class="topbar-divider"></span>
-                    <div class="topbar-user"><span class="user-avatar user-avatar--small"><?= screen_escape(screen_initial($user['full_name'])) ?></span><span><strong><?= screen_escape($user['full_name']) ?></strong><small><?= screen_escape($roleNames[$role]) ?></small></span></div>
+                <div class="topbar-actions"><span class="term-chip">HỌC KỲ 1 <span>·</span> 2026</span><span class="clock-chip" role="timer" aria-label="Ngày giờ hiện tại"><?= ui_icon('calendar') ?><span data-clock-date><?= screen_escape(["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"][(int) date('w')] . ', ' . date('d/m/Y')) ?></span><span class="clock-sep">·</span><?= ui_icon('clock') ?><time data-clock-time><?= screen_escape(date('H:i:s')) ?></time></span><?php
+                $bellTotal = (int) ($notificationTotal ?? 0);
+                $bellItems = $notificationRecent ?? [];
+                $bellLabels = [];
+                foreach (($navigation[$role] ?? []) as $navItem) {
+                    $bellLabels[$navItem['key']] = $navItem['label'];
+                }
+                ?><div class="notification-wrap" data-notification-root>
+                    <button class="notification-button" type="button" aria-label="Thông báo<?= $bellTotal > 0 ? ': ' . $bellTotal . ' chưa đọc' : '' ?>" aria-haspopup="true" aria-expanded="false" data-notification-toggle><span class="notification-glyph"><?= ui_icon('bell') ?></span><?php if ($bellTotal > 0): ?><i><?= $bellTotal > 99 ? '99+' : $bellTotal ?></i><?php endif; ?></button>
+                    <div class="notification-panel" role="menu" data-notification-panel hidden>
+                        <div class="notification-panel-head"><strong>Thông báo<?= $bellTotal > 0 ? ' (' . $bellTotal . ')' : '' ?></strong>
+                            <?php if ($bellTotal > 0): ?><form method="post" action="?page=<?= screen_escape(rawurlencode((string) ($screen ?? ''))) ?>"><input type="hidden" name="_csrf" value="<?= screen_escape(app_csrf_token()) ?>"><input type="hidden" name="action" value="notification_read"><button type="submit" class="link-button">Đã đọc tất cả</button></form><?php endif; ?>
+                        </div>
+                        <?php if (!$bellItems): ?><p class="notification-empty">Không có thông báo mới.</p><?php endif; ?>
+                        <?php foreach ($bellItems as $item): ?>
+                            <a class="notification-item" role="menuitem" href="?page=<?= screen_escape((string) ($item['link'] ?: $role . '/dashboard')) ?>">
+                                <small><?= screen_escape($bellLabels[$item['section']] ?? 'Hệ thống') ?> · <?= screen_escape(notification_time((string) $item['created_at'])) ?></small>
+                                <strong><?= screen_escape($item['title']) ?></strong>
+                                <?php if (!empty($item['message'])): ?><span><?= screen_escape($item['message']) ?></span><?php endif; ?>
+                            </a>
+                        <?php endforeach; ?>
+                        <?php if ($bellTotal > count($bellItems)): ?><p class="notification-empty">Và <?= $bellTotal - count($bellItems) ?> thông báo khác trong từng mục.</p><?php endif; ?>
+                    </div>
+                </div><span class="topbar-divider"></span>
+                    <div class="topbar-user"><span class="user-avatar user-avatar--small"><?php if (!empty($user['avatar'])): ?><img src="<?= screen_escape(app_avatar_url($user)) ?>" alt=""><?php else: ?><?= screen_escape(screen_initial($user['full_name'])) ?><?php endif; ?></span><span><strong><?= screen_escape($user['full_name']) ?></strong><small><?= screen_escape($roleNames[$role]) ?></small></span></div>
                 </div>
             </header>

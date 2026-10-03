@@ -17,7 +17,7 @@ InternTrack là ứng dụng quản lý kỳ thực tập dành cho sinh viên, 
 3. Mở `http://localhost/phpmyadmin`, tạo database tên `interntrack` với collation `utf8mb4_unicode_ci`.
 4. Chọn database vừa tạo, import `database/interntrack.sql`. Schema dùng `CREATE TABLE IF NOT EXISTS` và không xóa dữ liệu hiện có.
 5. Tại thư mục dự án, chạy `composer install` để cài PHPMailer.
-6. Với database đã cài từ phiên bản trước: chạy `database/migrations/20261001_password_reset_otp.sql` nếu chưa có bảng OTP, sau đó chạy `database/migrations/20261002_password_reset_verified_at.sql`. Với database mới, hai trường đã có trong schema chính.
+6. Với database đã cài từ phiên bản trước: chạy `database/migrations/20261001_password_reset_otp.sql` nếu chưa có bảng OTP, chạy `database/migrations/20261002_password_reset_verified_at.sql`, rồi lần lượt chạy các migration `20261003_internship_training_plan.sql` (cột `training_plan`), `20261004_notifications.sql` (bảng thông báo), `20261005_company_code_10_digits.sql` (mã doanh nghiệp 10 chữ số) và `20261006_task_submissions.sql` (minh chứng hoàn thành nhiệm vụ) trong thư mục `database/migrations/`. Với database mới, các thay đổi này đã có trong schema chính.
 7. Chỉ import `database/seed.sql` nếu cần dữ liệu mẫu để xem các màn hình và luồng nghiệp vụ. Không dùng dữ liệu seed làm tài khoản production; trang đăng nhập không còn hiển thị tài khoản hoặc mật khẩu demo.
 8. Mở `http://localhost/InternTrack/`.
 
@@ -27,13 +27,14 @@ InternTrack là ứng dụng quản lý kỳ thực tập dành cho sinh viên, 
 
 Sau khi import `database/seed.sql`, có thể đăng nhập bằng các tài khoản sau. Đây là tài khoản mẫu chỉ dành cho local/test và không dùng cho production.
 
-| Vai trò       | Username   | Email                        | Mật khẩu       |
-| ------------- | ---------- | ---------------------------- | -------------- |
-| Sinh viên     | `student`  | `student@interntrack.local`  | `Student@123`  |
-| Doanh nghiệp  | `company`  | `company@interntrack.local`  | `Company@123`  |
-| Giảng viên    | `lecturer` | `lecturer@interntrack.local` | `Lecturer@123` |
-| Quản trị viên | `admin`    | `admin@interntrack.local`    | `Bi@06112005`  |
+| Vai trò      | Username   | Email                        | Mật khẩu       |
+| ------------ | ---------- | ---------------------------- | -------------- |
+| Sinh viên    | `student`  | `student@interntrack.local`  | `Student@123`  |
+| Doanh nghiệp | `company`  | `company@interntrack.local`  | `Company@123`  |
+| Giảng viên   | `lecturer` | `lecturer@interntrack.local` | `Lecturer@123` |
 
+> Tài khoản quản trị viên không có mật khẩu demo; hãy tạo theo mục "Tạo tài khoản quản trị ban đầu" bên dưới.
+>
 > Nếu chưa có dữ liệu seed hoặc muốn tạo tài khoản mới, hãy tạo user trong bảng `users` với role tương ứng (`student`, `company`, `lecturer`, `admin`) và thêm bản ghi liên quan trong bảng `students`, `companies`, `lecturers` hoặc cấp quyền admin trong module quản trị.
 
 Cấu hình database mặc định: host `127.0.0.1`, port `3306`, database `interntrack`, user `root`, mật khẩu rỗng. Có thể ghi đè bằng biến môi trường `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Không dùng cấu hình mặc định này trên máy chủ thật.
@@ -57,10 +58,10 @@ Sau đó đăng nhập bằng email hoặc username vừa tạo. Tài khoản si
 
 ## Cấu hình gửi OTP bằng Gmail
 
-Ứng dụng dùng PHPMailer gửi SMTP trực tiếp qua Gmail với STARTTLS. OTP chỉ được chấp nhận sau khi Gmail báo gửi thành công; mã được lưu dưới dạng SHA-256 hash, hết hạn sau 10 phút, chỉ xác minh một lần, tối đa 5 lần nhập sai và giới hạn gửi lại 60 giây. Form tạo mật khẩu chỉ xuất hiện sau khi máy chủ xác minh OTP hợp lệ.
+Ứng dụng dùng PHPMailer gửi SMTP trực tiếp qua Gmail với STARTTLS. OTP chỉ được chấp nhận sau khi Gmail báo gửi thành công; mã được lưu dưới dạng SHA-256 hash, hết hạn sau 60 giây, chỉ xác minh một lần, tối đa 5 lần nhập sai và giới hạn gửi lại 60 giây. Form tạo mật khẩu chỉ xuất hiện sau khi máy chủ xác minh OTP hợp lệ.
 
 1. Bật xác minh 2 bước cho tài khoản Gmail, sau đó tạo Google App Password. Không dùng mật khẩu Gmail thông thường.
-2. Cấu hình các biến môi trường cho tiến trình Apache; không đặt bí mật trực tiếp trong mã nguồn:
+2. Cấu hình các biến sau bằng biến môi trường của Apache hoặc tệp `.env` ở thư mục gốc dự án (sao chép từ `.env.example`; tệp này đã được Git bỏ qua và `.htaccess` chặn truy cập qua web). Cách dùng `.env` không cần khởi động lại Apache. Không đặt bí mật trực tiếp trong mã nguồn:
 
 ```text
 MAIL_HOST=smtp.gmail.com
@@ -87,6 +88,7 @@ Không đưa App Password, database password hay biến môi trường bí mật
 - Tải CV PDF, DOC hoặc DOCX (tối đa 5 MB) lên hồ sơ. CV là điều kiện bắt buộc khi nộp đơn; bản CV tại thời điểm ứng tuyển được đính kèm hồ sơ.
 - Cập nhật ảnh đại diện JPG, PNG hoặc WebP (tối đa 3 MB), thông tin liên hệ và giới thiệu.
 - Theo dõi trạng thái đơn ứng tuyển, nhật ký, nhiệm vụ, báo cáo, đánh giá và tiến độ thực tập.
+- Báo hoàn thành nhiệm vụ phải kèm minh chứng: liên kết (Git, Drive...) và/hoặc tệp Word, PDF, Excel, PowerPoint, ZIP/RAR/7z, ảnh JPG/PNG hoặc văn bản .txt (tối đa 20 MB). Doanh nghiệp xem minh chứng rồi xác nhận hoàn tất hoặc yêu cầu làm lại.
 
 ### Doanh nghiệp
 
@@ -100,7 +102,7 @@ Không đưa App Password, database password hay biến môi trường bí mật
 ### Tài khoản và bảo vệ dữ liệu
 
 - Đăng nhập theo vai trò, đăng xuất, CSRF token, mật khẩu băm bằng `password_hash()` và đặt lại mật khẩu bằng OTP email.
-- Tệp CV, báo cáo và ảnh đại diện nằm trong `uploads/`; Apache chặn truy cập trực tiếp. CV/báo cáo được tải qua endpoint kiểm tra quyền; ảnh đại diện chỉ được xem bởi chính chủ.
+- Tệp CV, báo cáo và ảnh đại diện nằm trong `uploads/`; Apache chặn truy cập trực tiếp. CV/báo cáo được tải qua endpoint kiểm tra quyền; ảnh đại diện hiển thị cho mọi người dùng đã đăng nhập để ảnh của một người đồng bộ ở mọi nơi họ xuất hiện (menu, thanh trên cùng, hồ sơ, danh sách tiến độ).
 - Tệp tải lên được kiểm tra MIME thực tế và giới hạn dung lượng; không dựa riêng vào phần mở rộng do trình duyệt gửi lên.
 
 ## Gợi ý cơ hội và AI

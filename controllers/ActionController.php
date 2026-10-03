@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/PageController.php';
+require_once __DIR__ . '/NotificationController.php';
 
 // Các hàm trong file này xử lý các thao tác nghiệp vụ chính của hệ thống.
 // Mỗi thao tác kiểm tra quyền, validate dữ liệu đầu vào và cập nhật DB theo role tương ứng.
@@ -71,21 +72,46 @@ function store_uploaded_file(array $file, string $folder, int $maximumBytes): ?s
         throw new DomainException('Tệp tải lên không hợp lệ hoặc vượt quá dung lượng cho phép.');
     }
 
-    $mimeExtensions = $folder === 'avatars' ? [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-    ] : [
+    $documentTypes = [
         'application/pdf' => 'pdf',
         'application/msword' => 'doc',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
     ];
+    $mimeExtensions = match ($folder) {
+        'avatars' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
+        // Minh chứng hoàn thành nhiệm vụ: tài liệu, bảng tính, bài trình bày, ảnh chụp, văn bản và tệp nén.
+        'submissions' => $documentTypes + [
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'application/zip' => 'zip',
+            'application/x-zip-compressed' => 'zip',
+            'application/vnd.rar' => 'rar',
+            'application/x-rar' => 'rar',
+            'application/x-7z-compressed' => '7z',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'text/plain' => 'txt',
+        ],
+        default => $documentTypes,
+    };
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
     if (!isset($mimeExtensions[$mime])) {
-        throw new DomainException($folder === 'avatars' ? 'Ảnh đại diện phải là JPG, PNG hoặc WebP.' : 'Chỉ chấp nhận tệp PDF, DOC hoặc DOCX.');
+        throw new DomainException(match ($folder) {
+            'avatars' => 'Ảnh đại diện phải là JPG, PNG hoặc WebP.',
+            'submissions' => 'Minh chứng chấp nhận: Word, PDF, Excel, PowerPoint, ZIP/RAR/7z, ảnh JPG/PNG hoặc văn bản .txt.',
+            default => 'Chỉ chấp nhận tệp PDF, DOC hoặc DOCX.',
+        });
+    }
+    $extension = $mimeExtensions[$mime];
+    // Tệp Office hiện đại thực chất là ZIP nên có thể bị nhận là application/zip: giữ đuôi gốc nếu là docx/xlsx/pptx.
+    if ($extension === 'zip') {
+        $original = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        $extension = in_array($original, ['docx', 'xlsx', 'pptx'], true) ? $original : 'zip';
     }
 
-    $relativePath = 'uploads/' . $folder . '/' . bin2hex(random_bytes(16)) . '.' . $mimeExtensions[$mime];
+    $relativePath = 'uploads/' . $folder . '/' . bin2hex(random_bytes(16)) . '.' . $extension;
     $absolutePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
     $directory = dirname($absolutePath);
     if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
@@ -111,12 +137,19 @@ function serve_workspace_download(string $type, int $recordId, array $user): nev
     } elseif ($type === 'cv') {
         $statement = $connection->prepare(
             'SELECT s.cv_file AS file_path, CONCAT(u.full_name, \' - CV\') AS title FROM students s JOIN users u ON u.id = s.user_id
-             WHERE s.id = ? AND (s.user_id = ? OR ? = \'admin\' OR EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND (i.lecturer_id = ? OR i.company_id = ?))) LIMIT 1'
+             WHERE s.id = ? AND (s.user_id = ? OR ? = \'admin\' OR EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND (i.lecturer_id = ? OR i.company_id = ?)) OR EXISTS (SELECT 1 FROM applications a JOIN positions p ON p.id = a.position_id WHERE a.student_id = s.id AND p.company_id = ?)) LIMIT 1'
         );
-        $statement->execute([$recordId, $user['id'], $user['role'], $user['lecturer_id'] ?? 0, $user['company_id'] ?? 0]);
+        $statement->execute([$recordId, $user['id'], $user['role'], $user['lecturer_id'] ?? 0, $user['company_id'] ?? 0, $user['company_id'] ?? 0]);
+    } elseif ($type === 'task') {
+        $statement = $connection->prepare(
+            'SELECT t.submission_file AS file_path, CONCAT(\'Minh chung - \', t.title) AS title FROM tasks t JOIN internships i ON i.id = t.internship_id
+             WHERE t.id = ? AND (t.assigned_to = ? OR i.company_id = ? OR i.lecturer_id = ? OR ? = \'admin\') LIMIT 1'
+        );
+        $statement->execute([$recordId, $user['student_id'] ?? 0, $user['company_id'] ?? 0, $user['lecturer_id'] ?? 0, $user['role']]);
     } elseif ($type === 'avatar') {
-        $statement = $connection->prepare('SELECT avatar AS file_path, full_name AS title FROM users WHERE id = ? AND id = ? LIMIT 1');
-        $statement->execute([$recordId, $user['id']]);
+        // Ảnh đại diện hiển thị cho mọi người dùng đã đăng nhập để ảnh của một người đồng bộ ở mọi nơi họ xuất hiện.
+        $statement = $connection->prepare('SELECT avatar AS file_path, full_name AS title FROM users WHERE id = ? AND status = \'active\' LIMIT 1');
+        $statement->execute([$recordId]);
     } else {
         http_response_code(404);
         exit('Không tìm thấy tệp.');
@@ -133,11 +166,14 @@ function serve_workspace_download(string $type, int $recordId, array $user): nev
     $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
     $mime = $type === 'avatar'
         ? (['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'][$extension] ?? 'application/octet-stream')
-        : (['pdf' => 'application/pdf', 'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'][$extension] ?? 'application/octet-stream');
+        : (['pdf' => 'application/pdf', 'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'ppt' => 'application/vnd.ms-powerpoint', 'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'zip' => 'application/zip', 'rar' => 'application/vnd.rar', '7z' => 'application/x-7z-compressed', 'jpg' => 'image/jpeg', 'png' => 'image/png', 'txt' => 'text/plain'][$extension] ?? 'application/octet-stream');
     $downloadName = preg_replace('/[^\pL\pN ._-]/u', '', (string) $file['title']) ?: 'InternTrack';
     header('Content-Type: ' . $mime);
     header('Content-Length: ' . filesize($absolutePath));
     header('X-Content-Type-Options: nosniff');
+    if ($type === 'avatar') {
+        header('Cache-Control: private, max-age=86400');
+    }
     header($type === 'avatar' ? 'Content-Disposition: inline; filename="avatar.' . $extension . '"' : "Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode($downloadName . '.' . $extension));
     readfile($absolutePath);
     exit;
@@ -151,6 +187,14 @@ function handle_workspace_action(string $action, string $route, array $input, ar
     $successMessage = 'Đã lưu thay đổi.';
 
     switch ($action) {
+        case 'notification_read':
+            $user = action_user(['student', 'company', 'lecturer', 'admin']);
+            $notificationId = filter_var($input['notification_id'] ?? null, FILTER_VALIDATE_INT);
+            $notificationSection = action_value($input, 'section', 40);
+            notification_mark_read((int) $user['id'], $notificationId ?: null, $notificationId ? null : ($notificationSection ?: null));
+            $successMessage = 'Đã đánh dấu đã đọc.';
+            break;
+
         case 'apply':
             $user = action_user(['student']);
             $positionId = filter_var($input['position_id'] ?? null, FILTER_VALIDATE_INT);
@@ -162,6 +206,9 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (empty($studentProfile['cv_file'])) {
                 throw new DomainException('Hãy tải CV lên hồ sơ trước khi ứng tuyển.');
             }
+            if (page_one('SELECT id FROM applications WHERE student_id = ? AND position_id = ?', [$user['student_id'], $positionId])) {
+                throw new DomainException('Bạn đã ứng tuyển vị trí này rồi.');
+            }
             $connection->prepare('INSERT INTO applications (student_id, position_id, cv_file, cover_letter) VALUES (?, ?, ?, ?)')->execute([
                 $user['student_id'],
                 $positionId,
@@ -170,6 +217,10 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             ]);
             $applicationId = (int) $connection->lastInsertId();
             $connection->prepare('INSERT INTO application_status_history (application_id, old_status, new_status, changed_by, note) VALUES (?, NULL, \'pending\', ?, \'Ứng tuyển qua InternTrack.\')')->execute([$applicationId, $user['id']]);
+            $appliedPosition = page_one('SELECT title, company_id FROM positions WHERE id = ?', [$positionId]);
+            if ($appliedPosition) {
+                notify_company((int) $appliedPosition['company_id'], 'applications', 'Hồ sơ ứng tuyển mới', $user['full_name'] . ' vừa ứng tuyển vị trí ' . $appliedPosition['title'] . '.', 'company/applications');
+            }
             $successMessage = 'Đã gửi hồ sơ ứng tuyển.';
             $route = 'student/applications';
             break;
@@ -235,6 +286,14 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     if ($internshipInsert->rowCount() > 0) {
                         $newInternshipId = (int) $connection->lastInsertId();
                         $connection->prepare('INSERT INTO internship_status_history (internship_id, old_status, new_status, changed_by, note) VALUES (?, NULL, \'planned\', ?, \'Kỳ thực tập được tạo từ hồ sơ được chấp nhận.\')')->execute([$newInternshipId, $user['id']]);
+                        // Tự phân công giảng viên đang phụ trách ít kỳ thực tập nhất để sinh viên hiện ngay trong danh sách của giảng viên; quản trị viên vẫn có thể đổi lại.
+                        $autoLecturerId = $connection->query(
+                            'SELECT l.id FROM lecturers l JOIN users lu ON lu.id = l.user_id WHERE lu.status = \'active\'
+                             ORDER BY (SELECT COUNT(*) FROM internships i WHERE i.lecturer_id = l.id AND i.status IN (\'planned\', \'active\')), l.id LIMIT 1'
+                        )->fetchColumn();
+                        if ($autoLecturerId) {
+                            $connection->prepare('UPDATE internships SET lecturer_id = ? WHERE id = ?')->execute([$autoLecturerId, $newInternshipId]);
+                        }
                     }
                 }
                 $connection->commit();
@@ -244,6 +303,13 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                 }
                 throw $error;
             }
+            $reviewLabels = ['reviewing' => 'đang được doanh nghiệp xem xét', 'accepted' => 'đã được chấp nhận', 'rejected' => 'chưa phù hợp lần này'];
+            $reviewedPosition = page_one('SELECT title FROM positions WHERE id = ?', [$application['position_id']]);
+            if ($status === 'accepted' && !empty($autoLecturerId)) {
+                $acceptedStudent = page_one('SELECT u.full_name FROM students s JOIN users u ON u.id = s.user_id WHERE s.id = ?', [$application['student_id']]);
+                notify_lecturer((int) $autoLecturerId, 'students', 'Được phân công sinh viên mới', ($acceptedStudent['full_name'] ?? 'Một sinh viên') . ' thực tập tại ' . ($user['company_name'] ?? 'doanh nghiệp') . ' (' . ($reviewedPosition['title'] ?? '') . ').', 'lecturer/students');
+            }
+            notify_student((int) $application['student_id'], 'applications', 'Hồ sơ ứng tuyển cập nhật', 'Hồ sơ vị trí ' . ($reviewedPosition['title'] ?? '') . ' ' . $reviewLabels[$status] . '.', 'student/applications');
             $successMessage = $status === 'accepted' ? 'Ứng viên đã được nhận và kỳ thực tập đã được tạo.' : 'Đã cập nhật trạng thái hồ sơ.';
             break;
 
@@ -266,6 +332,10 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     $connection->rollBack();
                 }
                 throw $error;
+            }
+            $withdrawn = page_one('SELECT p.title, p.company_id FROM applications a JOIN positions p ON p.id = a.position_id WHERE a.id = ?', [$applicationId]);
+            if ($withdrawn) {
+                notify_company((int) $withdrawn['company_id'], 'applications', 'Ứng viên rút hồ sơ', $user['full_name'] . ' đã rút hồ sơ vị trí ' . $withdrawn['title'] . '.', 'company/applications');
             }
             $successMessage = 'Đã rút hồ sơ ứng tuyển.';
             break;
@@ -346,10 +416,11 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                 $sql .= ' AND company_id = ?';
                 $parameters[] = $user['company_id'];
             }
-            $connection->prepare($sql)->execute($parameters);
-            if ($connection->query('SELECT ROW_COUNT()')->fetchColumn() === '0') {
+            $ownerSql = 'SELECT id FROM positions WHERE id = ?' . ($user['role'] === 'company' ? ' AND company_id = ?' : '');
+            if (!page_one($ownerSql, array_slice($parameters, 1))) {
                 throw new DomainException('Không tìm thấy vị trí hoặc bạn không có quyền cập nhật.');
             }
+            $connection->prepare($sql)->execute($parameters);
             $successMessage = 'Đã cập nhật trạng thái vị trí.';
             break;
 
@@ -375,6 +446,7 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                 action_value($input, 'start_date', 10) ?: null,
                 action_value($input, 'due_date', 10) ?: null,
             ]);
+            notify_student((int) $internship['student_id'], 'tasks', 'Nhiệm vụ mới', 'Bạn được giao nhiệm vụ: ' . $title . '.', 'student/tasks');
             $successMessage = 'Đã giao nhiệm vụ.';
             break;
 
@@ -398,7 +470,47 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (!$allowed) {
                 throw new DomainException('Bạn không có quyền cập nhật nhiệm vụ này.');
             }
-            $connection->prepare('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?')->execute([$status, $status === 'completed' ? date('Y-m-d H:i:s') : null, $taskId]);
+            if ($user['role'] === 'student' && in_array($task['status'], ['completed', 'cancelled'], true)) {
+                throw new DomainException('Nhiệm vụ đã được đóng nên không thể cập nhật.');
+            }
+            if ($user['role'] === 'student' && $status === 'submitted') {
+                // Báo hoàn thành phải kèm minh chứng: liên kết (ví dụ Git) và/hoặc tệp (Word, PDF, ZIP...).
+                $link = action_value($input, 'submission_link', 500);
+                if ($link !== '' && (filter_var($link, FILTER_VALIDATE_URL) === false || preg_match('~^https?://~i', $link) !== 1)) {
+                    throw new DomainException('Liên kết minh chứng phải bắt đầu bằng http:// hoặc https://.');
+                }
+                $uploadedFile = $files['submission_file'] ?? [];
+                $hasNewFile = isset($uploadedFile['error']) && $uploadedFile['error'] !== UPLOAD_ERR_NO_FILE;
+                if ($link === '' && !$hasNewFile && empty($task['submission_link']) && empty($task['submission_file'])) {
+                    throw new DomainException('Hãy đính kèm minh chứng hoàn thành: liên kết (ví dụ Git) hoặc tệp (Word, PDF, ZIP...).');
+                }
+                $newFile = store_uploaded_file($uploadedFile, 'submissions', 20 * 1024 * 1024);
+                if ($newFile !== null && !empty($task['submission_file'])) {
+                    $oldPath = realpath(dirname(__DIR__) . '/' . $task['submission_file']);
+                    $uploadRoot = realpath(dirname(__DIR__) . '/uploads');
+                    if ($oldPath && $uploadRoot && str_starts_with($oldPath, $uploadRoot . DIRECTORY_SEPARATOR) && is_file($oldPath)) {
+                        unlink($oldPath);
+                    }
+                }
+                $connection->prepare('UPDATE tasks SET status = \'submitted\', completed_at = NULL, submission_link = ?, submission_file = ?, submission_note = ?, submitted_at = NOW() WHERE id = ?')->execute([
+                    $link !== '' ? $link : ($task['submission_link'] ?: null),
+                    $newFile ?? ($task['submission_file'] ?: null),
+                    action_value($input, 'submission_note', 2000) ?: null,
+                    $taskId,
+                ]);
+            } else {
+                $connection->prepare('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?')->execute([$status, $status === 'completed' ? date('Y-m-d H:i:s') : null, $taskId]);
+            }
+            $taskStatusText = ['todo' => 'được chuyển về cần làm', 'in_progress' => 'đang thực hiện', 'submitted' => 'đã được nộp, chờ phản hồi', 'completed' => 'đã hoàn tất', 'cancelled' => 'đã bị hủy'];
+            $taskMessage = 'Nhiệm vụ "' . $task['title'] . '" ' . $taskStatusText[$status] . '.';
+            if ($user['role'] === 'student') {
+                notify_company((int) $task['company_id'], 'tasks', 'Sinh viên cập nhật nhiệm vụ', $taskMessage, 'company/tasks');
+                if (!empty($task['lecturer_id'])) {
+                    notify_lecturer((int) $task['lecturer_id'], 'progress', 'Sinh viên cập nhật nhiệm vụ', $taskMessage, 'lecturer/progress');
+                }
+            } else {
+                notify_student((int) $task['assigned_to'], 'tasks', 'Nhiệm vụ được cập nhật', $taskMessage, 'student/tasks');
+            }
             $successMessage = 'Đã cập nhật nhiệm vụ.';
             break;
 
@@ -426,6 +538,9 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             } else {
                 $connection->prepare('INSERT INTO diaries (internship_id, student_id, diary_date, title, content, hours_worked, status) VALUES (?, ?, ?, ?, ?, ?, ?)')->execute([$internshipId, $user['student_id'], $date, $title, $content, $hours, $status]);
             }
+            if ($status === 'submitted' && !empty($internship['lecturer_id'])) {
+                notify_lecturer((int) $internship['lecturer_id'], 'diaries', 'Nhật ký mới chờ duyệt', $user['full_name'] . ' đã gửi nhật ký ngày ' . date('d/m/Y', (int) strtotime($date)) . '.', 'lecturer/diaries');
+            }
             $successMessage = $status === 'draft' ? 'Đã lưu bản nháp nhật ký.' : 'Đã gửi nhật ký cho giảng viên.';
             break;
 
@@ -440,6 +555,10 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $statement->execute([$status, action_value($input, 'feedback', 3000), $user['lecturer_id'], $diaryId, $user['lecturer_id']]);
             if ($statement->rowCount() === 0) {
                 throw new DomainException('Nhật ký không tồn tại, chưa gửi hoặc không thuộc nhóm bạn phụ trách.');
+            }
+            $reviewedDiary = page_one('SELECT student_id, diary_date FROM diaries WHERE id = ?', [$diaryId]);
+            if ($reviewedDiary) {
+                notify_student((int) $reviewedDiary['student_id'], 'diary', $status === 'approved' ? 'Nhật ký đã được duyệt' : 'Nhật ký cần chỉnh sửa', 'Nhật ký ngày ' . date('d/m/Y', (int) strtotime((string) $reviewedDiary['diary_date'])) . ($status === 'approved' ? ' đã được giảng viên duyệt.' : ' cần chỉnh sửa theo phản hồi của giảng viên.'), 'student/diary');
             }
             $successMessage = $status === 'approved' ? 'Đã duyệt nhật ký.' : 'Đã yêu cầu sinh viên chỉnh sửa nhật ký.';
             break;
@@ -457,12 +576,20 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (!in_array($type, ['proposal', 'midterm', 'final', 'other'], true) || $title === '' || $content === '') {
                 throw new DomainException('Loại, tiêu đề và nội dung báo cáo là bắt buộc.');
             }
+            $existingReport = page_one('SELECT status FROM reports WHERE internship_id = ? AND report_type = ?', [$internshipId, $type]);
+            if ($existingReport && !in_array($existingReport['status'], ['draft', 'rejected'], true)) {
+                throw new DomainException('Báo cáo này đã được nộp và không thể chỉnh sửa.');
+            }
             $filePath = store_uploaded_file($files['report_file'] ?? [], 'reports', 10 * 1024 * 1024);
             $connection->prepare(
                 'INSERT INTO reports (internship_id, student_id, report_type, title, content, file_path, status, submitted_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, IF(? = \'submitted\', NOW(), NULL))
                  ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content), file_path = COALESCE(VALUES(file_path), file_path), status = VALUES(status), submitted_at = VALUES(submitted_at), feedback = NULL, reviewed_by = NULL, reviewed_at = NULL'
             )->execute([$internshipId, $user['student_id'], $type, $title, $content, $filePath, $status, $status]);
+            $reportInternship = action_internship($internshipId, $user);
+            if ($status === 'submitted' && !empty($reportInternship['lecturer_id'])) {
+                notify_lecturer((int) $reportInternship['lecturer_id'], 'reports', 'Báo cáo mới chờ xem', $user['full_name'] . ' đã nộp báo cáo "' . $title . '".', 'lecturer/reports');
+            }
             $successMessage = $status === 'draft' ? 'Đã lưu bản nháp báo cáo.' : 'Đã nộp báo cáo.';
             break;
 
@@ -477,6 +604,10 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $statement->execute([$status, action_value($input, 'feedback', 5000), $user['lecturer_id'], $reportId, $user['lecturer_id']]);
             if ($statement->rowCount() === 0) {
                 throw new DomainException('Báo cáo không tồn tại hoặc không thuộc nhóm bạn phụ trách.');
+            }
+            $reviewedReport = page_one('SELECT student_id, title FROM reports WHERE id = ?', [$reportId]);
+            if ($reviewedReport) {
+                notify_student((int) $reviewedReport['student_id'], 'reports', $status === 'approved' ? 'Báo cáo đã được duyệt' : 'Báo cáo cần chỉnh sửa', 'Báo cáo "' . $reviewedReport['title'] . '" ' . ($status === 'approved' ? 'đã được giảng viên duyệt.' : 'cần chỉnh sửa theo phản hồi.'), 'student/reports');
             }
             $successMessage = 'Đã lưu phản hồi báo cáo.';
             break;
@@ -504,11 +635,14 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, IF(? = \'submitted\', NOW(), NULL))
                  ON DUPLICATE KEY UPDATE technical_score = VALUES(technical_score), attitude_score = VALUES(attitude_score), communication_score = VALUES(communication_score), discipline_score = VALUES(discipline_score), overall_score = VALUES(overall_score), comments = VALUES(comments), status = VALUES(status), submitted_at = VALUES(submitted_at)'
             )->execute([$internshipId, $user['id'], $type, ...$scores, $overall, action_value($input, 'comments', 5000), $status, $status]);
+            if ($status === 'submitted') {
+                notify_student((int) $internship['student_id'], 'evaluation', 'Bạn có đánh giá mới', ($type === 'company' ? 'Doanh nghiệp' : 'Giảng viên') . ' vừa gửi đánh giá kỳ thực tập của bạn.', 'student/evaluation');
+            }
             $successMessage = $status === 'draft' ? 'Đã lưu bản nháp đánh giá.' : 'Đã gửi đánh giá.';
             break;
 
         case 'profile_save':
-            $user = action_user(['student', 'company']);
+            $user = action_user(['student', 'company', 'lecturer', 'admin']);
             $fullName = action_value($input, 'full_name', 150);
             $phone = action_value($input, 'phone', 20);
             $companyAddress = $user['role'] === 'company' ? action_value($input, 'address', 255) : '';
@@ -520,13 +654,19 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             }
             $connection->prepare('UPDATE users SET full_name = ?, phone = ? WHERE id = ?')->execute([$fullName, $phone ?: null, $user['id']]);
             if ($user['role'] === 'student') {
-                $cvPath = store_uploaded_file($files['cv_file'] ?? [], 'cv', 15 * 1024 * 1024);
-                $avatarPath = store_uploaded_file($files['avatar_file'] ?? [], 'avatars', 10 * 1024 * 1024);
+                // Tài khoản được tạo trực tiếp trong bảng users có thể chưa có hồ sơ sinh viên: tạo hồ sơ tối thiểu.
+                $connection->prepare('INSERT IGNORE INTO students (user_id, student_code) VALUES (?, ?)')->execute([$user['id'], 'SV' . str_pad((string) $user['id'], 6, '0', STR_PAD_LEFT)]);
+                $cvPath = store_uploaded_file($files['cv_file'] ?? [], 'cv', 5 * 1024 * 1024);
+                $avatarPath = store_uploaded_file($files['avatar_file'] ?? [], 'avatars', 3 * 1024 * 1024);
                 $connection->prepare('UPDATE users SET avatar = COALESCE(?, avatar) WHERE id = ?')->execute([$avatarPath, $user['id']]);
                 $connection->prepare('UPDATE students SET address = ?, bio = ?, cv_file = COALESCE(?, cv_file) WHERE user_id = ?')->execute([action_value($input, 'address', 255), action_value($input, 'bio', 5000), $cvPath, $user['id']]);
             } else {
-                $avatarPath = store_uploaded_file($files['avatar_file'] ?? [], 'avatars', 10 * 1024 * 1024);
+                $avatarPath = store_uploaded_file($files['avatar_file'] ?? [], 'avatars', 3 * 1024 * 1024);
                 $connection->prepare('UPDATE users SET avatar = COALESCE(?, avatar) WHERE id = ?')->execute([$avatarPath, $user['id']]);
+            }
+            if ($user['role'] === 'lecturer') {
+                $connection->prepare('UPDATE lecturers SET department = ? WHERE user_id = ?')->execute([action_value($input, 'department', 150) ?: null, $user['id']]);
+            } elseif ($user['role'] === 'company') {
                 $connection->prepare('UPDATE companies SET website = ?, email = ?, phone = ?, address = ?, description = ? WHERE user_id = ?')->execute([
                     action_value($input, 'website', 255) ?: null,
                     action_value($input, 'company_email', 255) ?: null,
@@ -550,6 +690,41 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $successMessage = 'Đã cập nhật trạng thái doanh nghiệp.';
             break;
 
+        case 'company_update':
+            action_user(['admin']);
+            $companyId = filter_var($input['company_id'] ?? null, FILTER_VALIDATE_INT);
+            $status = action_value($input, 'status', 20);
+            $companyCode = action_value($input, 'company_code', 30);
+            if (!$companyId || !page_one('SELECT id FROM companies WHERE id = ?', [$companyId])) {
+                throw new DomainException('Không tìm thấy doanh nghiệp.');
+            }
+            if (!in_array($status, ['pending', 'active', 'inactive', 'rejected'], true)) {
+                throw new DomainException('Trạng thái doanh nghiệp không hợp lệ.');
+            }
+            if (preg_match('/^\d{10}$/', $companyCode) !== 1) {
+                throw new DomainException('Mã doanh nghiệp phải gồm đúng 10 chữ số.');
+            }
+            if (page_one('SELECT id FROM companies WHERE company_code = ? AND id <> ?', [$companyCode, $companyId])) {
+                throw new DomainException('Mã doanh nghiệp này đã thuộc về một doanh nghiệp khác.');
+            }
+            $connection->prepare('UPDATE companies SET status = ?, company_code = ? WHERE id = ?')->execute([$status, $companyCode, $companyId]);
+            $successMessage = 'Đã cập nhật doanh nghiệp.';
+            break;
+
+        case 'company_code':
+            action_user(['admin']);
+            $companyId = filter_var($input['company_id'] ?? null, FILTER_VALIDATE_INT);
+            $companyCode = action_value($input, 'company_code', 30);
+            if (!$companyId || preg_match('/^\d{10}$/', $companyCode) !== 1) {
+                throw new DomainException('Mã doanh nghiệp phải gồm đúng 10 chữ số.');
+            }
+            if (page_one('SELECT id FROM companies WHERE company_code = ? AND id <> ?', [$companyCode, $companyId])) {
+                throw new DomainException('Mã doanh nghiệp này đã thuộc về một doanh nghiệp khác.');
+            }
+            $connection->prepare('UPDATE companies SET company_code = ? WHERE id = ?')->execute([$companyCode, $companyId]);
+            $successMessage = 'Đã cập nhật mã doanh nghiệp.';
+            break;
+
         case 'user_status':
             $user = action_user(['admin']);
             $targetId = filter_var($input['user_id'] ?? null, FILTER_VALIDATE_INT);
@@ -567,7 +742,8 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $status = action_value($input, 'status', 20);
             $assignLecturer = $user['role'] === 'admin' && array_key_exists('lecturer_id', $input);
             $lecturerId = $assignLecturer ? (filter_var($input['lecturer_id'], FILTER_VALIDATE_INT) ?: null) : null;
-            $trainingPlan = array_key_exists('training_plan', $input) ? action_value($input, 'training_plan', 20000) : null;
+            // Kế hoạch thực tập do nhà trường phân công: chỉ quản trị viên được sửa; các vai trò khác chỉ xem.
+            $trainingPlan = $user['role'] === 'admin' && array_key_exists('training_plan', $input) ? action_value($input, 'training_plan', 20000) : null;
             if (!in_array($status, ['planned', 'active', 'completed', 'cancelled'], true)) {
                 throw new DomainException('Trạng thái kỳ thực tập không hợp lệ.');
             }
@@ -611,6 +787,9 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                 }
                 throw $error;
             }
+            if ($assignLecturer && $lecturerId !== null && (int) ($internship['lecturer_id'] ?? 0) !== $lecturerId) {
+                notify_lecturer($lecturerId, 'students', 'Được phân công sinh viên mới', 'Bạn được phân công phụ trách một kỳ thực tập mới.', 'lecturer/students');
+            }
             $successMessage = $assignLecturer ? 'Đã cập nhật trạng thái và giảng viên phụ trách.' : 'Đã cập nhật kỳ thực tập.';
             break;
 
@@ -623,6 +802,9 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $role = action_value($input, 'role', 20);
             if (!in_array($role, ['student', 'company', 'lecturer'], true) || $username === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || $fullName === '' || strlen($password) < 10) {
                 throw new DomainException('Hãy kiểm tra vai trò, họ tên, email và mật khẩu tối thiểu 10 ký tự.');
+            }
+            if (page_one('SELECT id FROM users WHERE username = ? OR email = ?', [$username, $email])) {
+                throw new DomainException('Tên đăng nhập hoặc email đã tồn tại.');
             }
             $connection->beginTransaction();
             try {
@@ -639,6 +821,12 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     $companyName = action_value($input, 'company_name', 200);
                     if ($companyCode === '' || $companyName === '') {
                         throw new DomainException('Mã và tên doanh nghiệp là bắt buộc.');
+                    }
+                    if (preg_match('/^\d{10}$/', $companyCode) !== 1) {
+                        throw new DomainException('Mã doanh nghiệp phải gồm đúng 10 chữ số.');
+                    }
+                    if (page_one('SELECT id FROM companies WHERE company_code = ?', [$companyCode])) {
+                        throw new DomainException('Mã doanh nghiệp này đã được sử dụng.');
                     }
                     $connection->prepare('INSERT INTO companies (user_id, company_code, company_name, email, status) VALUES (?, ?, ?, ?, \'pending\')')->execute([$newUserId, $companyCode, $companyName, $email]);
                 } else {

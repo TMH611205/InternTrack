@@ -148,6 +148,24 @@ return [
         'metrics' => [['label' => 'Đang mở', 'value' => '04', 'note' => '18 hồ sơ đang chờ'], ['label' => 'Bản nháp', 'value' => '02', 'note' => 'Chưa hiển thị với sinh viên'], ['label' => 'Đã đóng', 'value' => '07', 'note' => 'Từ đầu năm học']],
         'cards' => [['title' => 'Product Design Intern', 'meta' => 'TP. Hồ Chí Minh · Hybrid · 2 vị trí', 'description' => '18 hồ sơ · Hạn nhận 15/09/2026', 'tag' => 'Đang tuyển'], ['title' => 'Frontend Developer Intern', 'meta' => 'TP. Hồ Chí Minh · Tại văn phòng · 1 vị trí', 'description' => '11 hồ sơ · Hạn nhận 20/09/2026', 'tag' => 'Đang tuyển'], ['title' => 'Content Intern', 'meta' => 'Remote · 1 vị trí', 'description' => '8 hồ sơ · Hạn nhận 30/09/2026', 'tag' => 'Đang tuyển']],
     ],
+    'lecturer/profile' => [
+        'role' => 'lecturer',
+        'active' => 'profile',
+        'kind' => 'profile',
+        'eyebrow' => 'Hồ sơ cá nhân',
+        'title' => 'Giảng viên',
+        'description' => '',
+        'fields' => [],
+    ],
+    'admin/profile' => [
+        'role' => 'admin',
+        'active' => 'profile',
+        'kind' => 'profile',
+        'eyebrow' => 'Hồ sơ cá nhân',
+        'title' => 'Quản trị viên',
+        'description' => '',
+        'fields' => [],
+    ],
     'company/profile' => [
         'role' => 'company',
         'active' => 'profile',
@@ -155,7 +173,7 @@ return [
         'eyebrow' => 'Thông tin doanh nghiệp',
         'title' => 'Northstar Studio',
         'description' => 'Thiết kế sản phẩm số lấy con người làm trung tâm · Hồ sơ doanh nghiệp đã xác minh.',
-        'fields' => [['label' => 'Mã doanh nghiệp', 'value' => 'NS-2021-018'], ['label' => 'Website', 'value' => 'northstar.studio'], ['label' => 'Email liên hệ', 'value' => 'people@northstar.studio'], ['label' => 'Điện thoại', 'value' => '+84 28 3822 0188'], ['label' => 'Địa chỉ', 'value' => '18 Nguyễn Thị Minh Khai, Quận 1, TP. Hồ Chí Minh'], ['label' => 'Giới thiệu', 'value' => 'Studio sản phẩm độc lập, đồng hành cùng doanh nghiệp xây dựng trải nghiệm số có ý nghĩa.']],
+        'fields' => [['label' => 'Mã doanh nghiệp', 'value' => '0100000001'], ['label' => 'Website', 'value' => 'northstar.studio'], ['label' => 'Email liên hệ', 'value' => 'people@northstar.studio'], ['label' => 'Điện thoại', 'value' => '+84 28 3822 0188'], ['label' => 'Địa chỉ', 'value' => '18 Nguyễn Thị Minh Khai, Quận 1, TP. Hồ Chí Minh'], ['label' => 'Giới thiệu', 'value' => 'Studio sản phẩm độc lập, đồng hành cùng doanh nghiệp xây dựng trải nghiệm số có ý nghĩa.']],
     ],
     'company/tasks' => [
         'role' => 'company',
@@ -250,7 +268,7 @@ return [
         'description' => 'Xác minh thông tin đối tác và quản lý trạng thái tham gia chương trình.',
         'metrics' => [['label' => 'Đang hoạt động', 'value' => '86', 'note' => '64 có thực tập sinh'], ['label' => 'Chờ xác minh', 'value' => '07', 'note' => 'Hồ sơ mới nhất 2 giờ trước'], ['label' => 'Tạm ngưng', 'value' => '03', 'note' => 'Cần rà soát lại']],
         'columns' => ['Doanh nghiệp', 'Mã số', 'Vị trí mở', 'Trạng thái'],
-        'rows' => [['Northstar Studio', 'NS-2021-018', '04', 'Hoạt động'], ['Mộc Lab', 'ML-2020-042', '02', 'Hoạt động'], ['Mây Creative', 'MC-2024-011', '03', 'Chờ xác minh'], ['Lá House', 'LH-2023-028', '01', 'Hoạt động']],
+        'rows' => [['Northstar Studio', '0100000001', '04', 'Hoạt động'], ['Mộc Lab', '0100000002', '02', 'Hoạt động'], ['Mây Creative', '0100000003', '03', 'Chờ xác minh'], ['Lá House', '0100000004', '01', 'Hoạt động']],
     ],
     'admin/internship' => [
         'role' => 'admin',

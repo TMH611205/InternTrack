@@ -98,8 +98,11 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
                     <form class="auth-form" method="post" action="?page=auth/login">
                         <input type="hidden" name="_csrf" value="<?= $authEscape(app_csrf_token()) ?>"><input type="hidden" name="action" value="login">
                         <label for="email">Email hoặc tên đăng nhập</label><input id="email" name="login" type="text" autocomplete="username" placeholder="email hoặc tên đăng nhập" required>
-                        <div class="password-label"><label for="password">Mật khẩu</label><a href="?page=auth/forgot-password">Quên mật khẩu?</a></div>
+                        <div class="password-field">
+                        <div class="password-label"><label for="password">Mật khẩu</label></div>
                         <div class="password-input-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required><button type="button" class="password-toggle" data-password-target="password" data-password-toggle aria-label="Hiện mật khẩu" aria-pressed="false"><span class="password-toggle-icon" aria-hidden="true">👁</span></button></div>
+                        <a class="password-forgot" href="?page=auth/forgot-password">Quên mật khẩu?</a>
+                        </div>
                         <button class="button button--primary auth-submit" type="submit">Đăng nhập <span aria-hidden="true">↗</span></button>
                     </form>
                 <?php endif; ?>

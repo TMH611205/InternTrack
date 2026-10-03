@@ -43,7 +43,16 @@ if (!function_exists('screen_escape')) {
 }
 
 require_once __DIR__ . '/../../controllers/PageController.php';
+$user ??= authenticated_user();
 $screenData = load_screen_data($screen, $screenData, $user);
+
+// Thông báo: số chưa đọc theo từng mục (menu bên), tổng (chuông) và các thông báo của mục đang mở.
+require_once __DIR__ . '/../../controllers/NotificationController.php';
+$notificationCounts = notification_counts((int) $user['id']);
+$notificationTotal = array_sum($notificationCounts);
+$notificationRecent = $notificationTotal > 0 ? notification_unread((int) $user['id'], null, 8) : [];
+$sectionKey = (string) ($screenData['active'] ?? '');
+$sectionNotices = ($sectionKey !== '' && ($notificationCounts[$sectionKey] ?? 0) > 0) ? notification_unread((int) $user['id'], $sectionKey, 10) : [];
 
 require __DIR__ . '/header.php';
 require __DIR__ . '/content.php';

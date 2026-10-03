@@ -47,6 +47,9 @@ $primaryActions['company/tasks'] = ['label' => 'Giao nhiệm vụ', 'href' => '#
 if ($screen === 'student/internship-detail' && !empty($screenData['position_id']) && empty($screenData['application_status'])) {
     $primaryActions[$screen] = ['label' => 'Ứng tuyển vị trí', 'href' => '#application-form'];
 }
+if ($screen === 'student/diary' && empty($screenData['internship_id'])) {
+    unset($primaryActions[$screen]);
+}
 $primaryAction = $primaryActions[$screen] ?? null;
 ?>
 <div class="page-wrap">
@@ -67,7 +70,34 @@ $primaryAction = $primaryActions[$screen] ?? null;
     </section>
 
     <?php if ($flash !== null): ?><div class="flash-message flash--<?= screen_escape($flash['type']) ?>" role="status"><?= screen_escape($flash['message']) ?></div><?php endif; ?>
+    <?php if (!empty($sectionNotices)): ?>
+        <section class="section-notices" aria-label="Thông báo của mục này">
+            <div class="section-notices-head">
+                <strong><?= count($sectionNotices) ?> thông báo mới ở mục này</strong>
+                <?php if (count($sectionNotices) > 1): ?><form method="post" action="?page=<?= screen_escape(rawurlencode($screen)) ?>"><input type="hidden" name="_csrf" value="<?= screen_escape(app_csrf_token()) ?>"><input type="hidden" name="action" value="notification_read"><input type="hidden" name="section" value="<?= screen_escape($sectionKey) ?>"><button type="submit" class="link-button">Đã đọc tất cả</button></form><?php endif; ?>
+            </div>
+            <?php foreach ($sectionNotices as $notice): ?>
+                <article class="section-notice">
+                    <span class="section-notice-icon"><?= ui_icon('bell') ?></span>
+                    <div><strong><?= screen_escape($notice['title']) ?></strong><?php if (!empty($notice['message'])): ?><p><?= screen_escape($notice['message']) ?></p><?php endif; ?><small><?= screen_escape(notification_time((string) $notice['created_at'])) ?></small></div>
+                    <form method="post" action="?page=<?= screen_escape(rawurlencode($screen)) ?>"><input type="hidden" name="_csrf" value="<?= screen_escape(app_csrf_token()) ?>"><input type="hidden" name="action" value="notification_read"><input type="hidden" name="notification_id" value="<?= (int) $notice['id'] ?>"><button type="submit" class="link-button">Đã xem</button></form>
+                </article>
+            <?php endforeach; ?>
+        </section>
+    <?php endif; ?>
     <?php require __DIR__ . '/forms.php'; ?>
+
+    <?php if (array_key_exists('plan', $screenData)): $plan = $screenData['plan']; ?>
+        <section class="panel plan-panel" aria-label="Kế hoạch thực tập">
+            <div class="plan-panel-head">
+                <div><p class="eyebrow">Kế hoạch thực tập</p><h2><?= $plan ? screen_escape($plan['heading']) : 'Chưa có kỳ thực tập' ?></h2><?php if ($plan): ?><p class="modal-sub"><?= screen_escape($plan['meta']) ?></p><?php endif; ?></div>
+                <span class="badge badge--neutral">Chỉ xem</span>
+            </div>
+            <?php if ($plan && $plan['text'] !== ''): ?><div class="plan-text"><?= screen_escape($plan['text']) ?></div>
+            <?php else: ?><p class="plan-empty"><?= $plan ? 'Nhà trường chưa nhập kế hoạch cho kỳ thực tập này.' : 'Kế hoạch sẽ hiện ở đây khi bạn được doanh nghiệp nhận thực tập.' ?></p><?php endif; ?>
+            <p class="plan-note">Kế hoạch do nhà trường phân công. Doanh nghiệp có thể giao thêm nhiệm vụ ngoài kế hoạch này ở mục Nhiệm vụ.</p>
+        </section>
+    <?php endif; ?>
 
     <?php if (!empty($screenData['metrics'])): ?>
         <section class="metric-grid" aria-label="Chỉ số tổng quan">
@@ -121,6 +151,13 @@ $primaryAction = $primaryActions[$screen] ?? null;
 
     <?php elseif ($kind === 'table'): ?>
         <section class="panel table-panel">
+            <?php if ($screen === 'admin/users' && !empty($screenData['groups'])): ?>
+                <nav class="group-tabs" aria-label="Nhóm tài khoản">
+                    <?php foreach ($screenData['groups'] as $groupTab): ?>
+                        <a class="group-tab <?= $screenData['group'] === $groupTab['key'] ? 'is-active' : '' ?>" href="?page=admin/users&amp;group=<?= screen_escape($groupTab['key']) ?>" <?= $screenData['group'] === $groupTab['key'] ? 'aria-current="page"' : '' ?>><?= screen_escape($groupTab['label']) ?><span><?= (int) $groupTab['count'] ?></span></a>
+                    <?php endforeach; ?>
+                </nav>
+            <?php endif; ?>
             <div class="table-toolbar">
                 <div>
                     <p class="eyebrow">Danh sách</p>
@@ -152,24 +189,51 @@ $primaryAction = $primaryActions[$screen] ?? null;
                                                 <option value="rejected">Yêu cầu sửa</option>
                                             </select><button type="submit">Lưu</button></form>
                                     <?php elseif ($screen === 'admin/companies' && $recordId): ?>
-                                        <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="company_status"><input type="hidden" name="company_id" value="<?= (int) $recordId ?>"><select name="status" aria-label="Trạng thái doanh nghiệp">
-                                                <option value="active">Xác minh</option>
-                                                <option value="inactive">Tạm ngưng</option>
-                                                <option value="rejected">Từ chối</option>
-                                            </select><button type="submit">Lưu</button></form>
+                                        <?php $currentStatus = (string) ($screenData['row_status'][$rowIndex] ?? 'active'); ?>
+                                        <button type="button" class="table-edit-button" data-dialog-open="company-edit-<?= (int) $recordId ?>">Chỉnh sửa</button>
+                                        <dialog class="modal" id="company-edit-<?= (int) $recordId ?>" aria-label="Chỉnh sửa doanh nghiệp">
+                                            <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form"><?= $csrfField ?><input type="hidden" name="action" value="company_update"><input type="hidden" name="company_id" value="<?= (int) $recordId ?>">
+                                                <header class="modal-head"><div><p class="eyebrow">Chỉnh sửa doanh nghiệp</p><h2><?= screen_escape($row[0]) ?></h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
+                                                <label>Mã doanh nghiệp (10 chữ số)<input name="company_code" value="<?= screen_escape($row[1]) ?>" maxlength="10" minlength="10" pattern="[0-9]{10}" inputmode="numeric" title="Mã doanh nghiệp gồm đúng 10 chữ số" required></label>
+                                                <label>Trạng thái<select name="status">
+                                                        <?php foreach (['active' => 'Hoạt động (đã xác minh)', 'pending' => 'Chờ xác minh', 'inactive' => 'Tạm ngưng', 'rejected' => 'Từ chối'] as $value => $label): ?><option value="<?= $value ?>" <?= $currentStatus === $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
+                                                    </select></label>
+                                                <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu thay đổi</button></div>
+                                            </form>
+                                        </dialog>
+                                    <?php elseif (in_array($screen, ['company/inters', 'lecturer/students'], true) && $recordId): ?>
+                                        <?php $planText = (string) ($screenData['row_plans'][$rowIndex] ?? ''); ?>
+                                        <button type="button" class="table-edit-button" data-dialog-open="plan-<?= (int) $recordId ?>">Xem kế hoạch</button>
+                                        <dialog class="modal" id="plan-<?= (int) $recordId ?>" aria-label="Kế hoạch thực tập">
+                                            <div class="workspace-form modal-form">
+                                                <header class="modal-head"><div><p class="eyebrow">Kế hoạch thực tập</p><h2><?= screen_escape(preg_replace('/ · .*/u', '', (string) $row[0])) ?></h2><p class="modal-sub"><?= screen_escape($row[1]) ?></p></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
+                                                <?php if ($planText !== ''): ?><div class="plan-text"><?= screen_escape($planText) ?></div><?php else: ?><p class="plan-empty">Nhà trường chưa nhập kế hoạch cho kỳ thực tập này.</p><?php endif; ?>
+                                                <p class="plan-note">Kế hoạch do nhà trường phân công, chỉ xem.<?= $screen === 'company/inters' ? ' Bạn có thể giao thêm nhiệm vụ ngoài kế hoạch ở mục Nhiệm vụ.' : '' ?></p>
+                                                <div class="modal-actions"><button type="button" class="button button--primary" data-dialog-close>Đóng</button></div>
+                                            </div>
+                                        </dialog>
                                     <?php elseif ($screen === 'admin/users' && $recordId && (int) $recordId !== (int) $user['id']): ?>
-                                        <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="user_status"><input type="hidden" name="user_id" value="<?= (int) $recordId ?>"><input type="hidden" name="status" value="<?= $row[3] === 'Hoạt động' ? 'inactive' : 'active' ?>"><button type="submit"><?= $row[3] === 'Hoạt động' ? 'Tạm khóa' : 'Kích hoạt' ?></button></form>
+                                        <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="user_status"><input type="hidden" name="user_id" value="<?= (int) $recordId ?>"><input type="hidden" name="status" value="<?= !empty($screenData['row_active'][$rowIndex]) ? 'inactive' : 'active' ?>"><button type="submit"><?= !empty($screenData['row_active'][$rowIndex]) ? 'Tạm khóa' : 'Kích hoạt' ?></button></form>
                                     <?php elseif ($screen === 'admin/positions' && $recordId): ?>
                                         <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="position_status"><input type="hidden" name="position_id" value="<?= (int) $recordId ?>"><input type="hidden" name="status" value="<?= $row[4] === 'Đang mở' ? 'closed' : 'open' ?>"><button type="submit"><?= $row[4] === 'Đang mở' ? 'Đóng tin' : 'Mở tin' ?></button></form>
                                     <?php elseif ($screen === 'admin/internship' && $recordId): ?>
-                                        <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="internship_update"><input type="hidden" name="internship_id" value="<?= (int) $recordId ?>"><select name="status" aria-label="Trạng thái kỳ thực tập">
-                                                <option value="planned" <?= $row[3] === 'Sắp bắt đầu' ? 'selected' : '' ?>>Chưa bắt đầu</option>
-                                                <option value="active" <?= $row[3] === 'Đang diễn ra' ? 'selected' : '' ?>>Đang diễn ra</option>
-                                                <option value="completed" <?= $row[3] === 'Hoàn tất' ? 'selected' : '' ?>>Hoàn tất</option>
-                                                <option value="cancelled" <?= $row[3] === 'Đã hủy' ? 'selected' : '' ?>>Hủy</option>
-                                            </select><select name="lecturer_id" aria-label="Giảng viên phụ trách">
-                                                <option value="">Chưa phân công</option><?php foreach ($screenData['lecturer_options'] as $lecturer): ?><option value="<?= (int) $lecturer['id'] ?>" <?= (string) ($screenData['row_lecturer_ids'][$rowIndex] ?? '') === (string) $lecturer['id'] ? 'selected' : '' ?>><?= screen_escape($lecturer['full_name']) ?></option><?php endforeach; ?>
-                                            </select><textarea name="training_plan" rows="2" maxlength="20000" placeholder="Kế hoạch thực tập"><?= screen_escape($screenData['row_training_plans'][$rowIndex] ?? '') ?></textarea><button type="submit">Lưu</button></form>
+                                        <?php $currentStatus = (string) ($screenData['row_status'][$rowIndex] ?? 'planned'); ?>
+                                        <button type="button" class="table-edit-button" data-dialog-open="internship-edit-<?= (int) $recordId ?>">Cập nhật</button>
+                                        <dialog class="modal" id="internship-edit-<?= (int) $recordId ?>" aria-label="Cập nhật kỳ thực tập">
+                                            <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form"><?= $csrfField ?><input type="hidden" name="action" value="internship_update"><input type="hidden" name="internship_id" value="<?= (int) $recordId ?>">
+                                                <header class="modal-head"><div><p class="eyebrow">Cập nhật kỳ thực tập</p><h2><?= screen_escape($row[0]) ?></h2><p class="modal-sub"><?= screen_escape($row[1]) ?></p></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
+                                                <div class="form-grid">
+                                                    <label>Trạng thái<select name="status">
+                                                            <?php foreach (['planned' => 'Chưa bắt đầu', 'active' => 'Đang diễn ra', 'completed' => 'Hoàn tất', 'cancelled' => 'Đã hủy'] as $value => $label): ?><option value="<?= $value ?>" <?= $currentStatus === $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
+                                                        </select></label>
+                                                    <label>Giảng viên phụ trách<select name="lecturer_id">
+                                                            <option value="">Chưa phân công</option><?php foreach ($screenData['lecturer_options'] as $lecturer): ?><option value="<?= (int) $lecturer['id'] ?>" <?= (string) ($screenData['row_lecturer_ids'][$rowIndex] ?? '') === (string) $lecturer['id'] ? 'selected' : '' ?>><?= screen_escape($lecturer['full_name']) ?></option><?php endforeach; ?>
+                                                        </select></label>
+                                                </div>
+                                                <label>Kế hoạch thực tập<textarea name="training_plan" rows="6" maxlength="20000" placeholder="Mục tiêu, lộ trình theo tuần, yêu cầu đầu ra..."><?= screen_escape($screenData['row_training_plans'][$rowIndex] ?? '') ?></textarea></label>
+                                                <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu thay đổi</button></div>
+                                            </form>
+                                        </dialog>
                                     <?php else: ?><span class="table-action-note">—</span><?php endif; ?>
                                 </td>
                             </tr>
@@ -189,7 +253,41 @@ $primaryAction = $primaryActions[$screen] ?? null;
                     </div>
                     <?php foreach ($board['items'] as $item): ?><article class="task-card"><span class="task-marker"></span>
                             <h3><?= screen_escape($item['title']) ?></h3>
-                            <p><?= screen_escape($item['meta']) ?></p><?php if (!empty($item['id']) && $screen === 'student/tasks' && in_array($item['status'], ['todo', 'in_progress'], true)): ?><form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="task_status"><input type="hidden" name="task_id" value="<?= (int) $item['id'] ?>"><input type="hidden" name="status" value="<?= $item['status'] === 'todo' ? 'in_progress' : 'submitted' ?>"><button type="submit"><?= $item['status'] === 'todo' ? 'Bắt đầu' : 'Gửi hoàn tất' ?></button></form><?php elseif (!empty($item['id']) && $screen === 'company/tasks'): ?><form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="task_status"><input type="hidden" name="task_id" value="<?= (int) $item['id'] ?>"><input type="hidden" name="status" value="<?= $item['status'] === 'completed' ? 'in_progress' : 'completed' ?>"><button type="submit"><?= $item['status'] === 'completed' ? 'Mở lại' : 'Hoàn tất' ?></button></form><?php endif; ?>
+                            <p><?= screen_escape($item['meta']) ?></p><?php if (!empty($item['description']) && $screen === 'student/tasks'): ?><p class="task-description"><?= screen_escape($item['description']) ?></p><?php endif; ?>
+                            <?php if (!empty($item['submission'])): $evidence = $item['submission']; ?>
+                                <div class="task-evidence">
+                                    <strong>Minh chứng hoàn thành<?= !empty($evidence['submitted_at']) ? ' · ' . screen_escape($evidence['submitted_at']) : '' ?></strong>
+                                    <?php if (!empty($evidence['link'])): ?><a href="<?= screen_escape($evidence['link']) ?>" target="_blank" rel="noopener noreferrer">Liên kết: <?= screen_escape(mb_strimwidth($evidence['link'], 0, 60, '…', 'UTF-8')) ?></a><?php endif; ?>
+                                    <?php if (!empty($evidence['has_file'])): ?><a href="?download=task&amp;id=<?= (int) $item['id'] ?>">Tải tệp đính kèm (<?= screen_escape(strtoupper(pathinfo((string) $evidence['file_name'], PATHINFO_EXTENSION))) ?>)</a><?php endif; ?>
+                                    <?php if (!empty($evidence['note'])): ?><p><?= screen_escape($evidence['note']) ?></p><?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($item['id']) && $screen === 'student/tasks' && $item['status'] === 'todo'): ?>
+                                <form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="task_status"><input type="hidden" name="task_id" value="<?= (int) $item['id'] ?>"><input type="hidden" name="status" value="in_progress"><button type="submit">Bắt đầu</button></form>
+                            <?php elseif (!empty($item['id']) && $screen === 'student/tasks' && $item['status'] === 'in_progress'): ?>
+                                <button type="button" class="task-submit-trigger" data-dialog-open="task-submit-<?= (int) $item['id'] ?>">Báo cáo hoàn thành</button>
+                                <dialog class="modal" id="task-submit-<?= (int) $item['id'] ?>" aria-labelledby="task-submit-title-<?= (int) $item['id'] ?>">
+                                    <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form"><?= $csrfField ?><input type="hidden" name="action" value="task_status"><input type="hidden" name="task_id" value="<?= (int) $item['id'] ?>"><input type="hidden" name="status" value="submitted">
+                                        <header class="modal-head">
+                                            <div><p class="eyebrow">Báo cáo hoàn thành</p><h2 id="task-submit-title-<?= (int) $item['id'] ?>"><?= screen_escape($item['title']) ?></h2></div>
+                                            <button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button>
+                                        </header>
+                                        <p class="form-hint">Gửi kèm minh chứng để doanh nghiệp kiểm tra: liên kết (Git, Drive...) và/hoặc tệp (Word, PDF, ZIP...). Cần ít nhất một trong hai.</p>
+                                        <label>Liên kết (Git, Drive, Figma...)<input name="submission_link" type="url" maxlength="500" placeholder="https://github.com/ten-ban/du-an"></label>
+                                        <label>Tệp minh chứng (tối đa 20 MB)<input name="submission_file" type="file" accept=".doc,.docx,.pdf,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.jpg,.jpeg,.png,.txt"></label>
+                                        <label>Ghi chú<textarea name="submission_note" rows="3" maxlength="2000" placeholder="Mô tả ngắn những gì bạn đã làm"></textarea></label>
+                                        <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Gửi hoàn thành</button></div>
+                                    </form>
+                                </dialog>
+                            <?php elseif (!empty($item['id']) && $screen === 'student/tasks' && $item['status'] === 'submitted'): ?>
+                                <p class="task-state">Đã gửi, chờ doanh nghiệp xác nhận.</p>
+                            <?php elseif (!empty($item['id']) && $screen === 'company/tasks'): ?>
+                                <div class="task-company-actions">
+                                    <?php if ($item['status'] !== 'completed'): ?><form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="task_status"><input type="hidden" name="task_id" value="<?= (int) $item['id'] ?>"><input type="hidden" name="status" value="completed"><button type="submit">Xác nhận hoàn tất</button></form><?php endif; ?>
+                                    <?php if ($item['status'] === 'submitted'): ?><form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="task_status"><input type="hidden" name="task_id" value="<?= (int) $item['id'] ?>"><input type="hidden" name="status" value="in_progress"><button type="submit">Yêu cầu làm lại</button></form><?php endif; ?>
+                                    <?php if ($item['status'] === 'completed'): ?><form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="task_status"><input type="hidden" name="task_id" value="<?= (int) $item['id'] ?>"><input type="hidden" name="status" value="in_progress"><button type="submit">Mở lại</button></form><?php endif; ?>
+                                </div>
+                            <?php endif; ?>
                         </article><?php endforeach; ?>
                 </div>
             <?php endforeach; ?>
@@ -246,9 +344,10 @@ $primaryAction = $primaryActions[$screen] ?? null;
                         <a href="?page=student/internship-detail&amp;id=<?= (int) ($card['id'] ?? 0) ?>" class="text-link">Xem chi tiết<span aria-hidden="true"> ↗</span></a>
                     <?php elseif ($screen === 'company/positions' && !empty($card['id'])): ?>
                         <form method="post" action="<?= screen_escape($formAction) ?>" class="task-status-form"><?= $csrfField ?><input type="hidden" name="action" value="position_status"><input type="hidden" name="position_id" value="<?= (int) $card['id'] ?>"><input type="hidden" name="status" value="<?= $card['status'] === 'open' ? 'closed' : 'open' ?>"><button type="submit"><?= $card['status'] === 'open' ? 'Đóng nhận hồ sơ' : 'Mở lại vị trí' ?></button></form>
-                        <details class="action-panel position-edit-panel">
-                            <summary><span>Chỉnh sửa tin</span><small>Bổ sung nơi làm việc nếu còn thiếu</small></summary>
-                            <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form">
+                        <button type="button" class="action-trigger" data-dialog-open="position-edit-<?= (int) $card['id'] ?>"><span>Chỉnh sửa tin</span><small>Bổ sung nơi làm việc nếu còn thiếu</small></button>
+    <dialog class="modal" id="position-edit-<?= (int) $card['id'] ?>" aria-label="Chỉnh sửa tin">
+        <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
+                <header class="modal-head"><div><p class="eyebrow">Bổ sung nơi làm việc nếu còn thiếu</p><h2>Chỉnh sửa tin</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
                                 <?= $csrfField ?><input type="hidden" name="action" value="position_save"><input type="hidden" name="position_id" value="<?= (int) $card['id'] ?>">
                                 <label>Tên vị trí<input name="title" maxlength="200" value="<?= screen_escape($card['title']) ?>" required></label>
                                 <label>Mô tả công việc<textarea name="description" rows="3" required><?= screen_escape($card['position_description']) ?></textarea></label>
@@ -260,9 +359,9 @@ $primaryAction = $primaryActions[$screen] ?? null;
                                             <option value="closed" <?= $card['status'] === 'closed' ? 'selected' : '' ?>>Đã đóng</option>
                                             <option value="cancelled" <?= $card['status'] === 'cancelled' ? 'selected' : '' ?>>Đã hủy</option>
                                         </select></label></div>
-                                <button class="button button--primary" type="submit">Lưu tin tuyển dụng</button>
+                                <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu tin tuyển dụng</button></div>
                             </form>
-                        </details>
+                        </dialog>
                     <?php elseif ($kind === 'reports' && !empty($card['id'])): ?>
                         <?php if (!empty($card['file_path'])): ?><a href="?download=report&amp;id=<?= (int) $card['id'] ?>" class="text-link">Tải báo cáo<span aria-hidden="true"> ↓</span></a><?php else: ?><span class="text-link">Chưa có tệp đính kèm</span><?php endif; ?>
                         <?php if ($screen === 'lecturer/reports'): ?><form method="post" action="<?= screen_escape($formAction) ?>" class="review-card-form"><?= $csrfField ?><input type="hidden" name="action" value="report_review"><input type="hidden" name="report_id" value="<?= (int) $card['id'] ?>"><textarea name="feedback" rows="2" maxlength="5000" placeholder="Nhận xét cho sinh viên"></textarea>
@@ -280,7 +379,7 @@ $primaryAction = $primaryActions[$screen] ?? null;
     <?php elseif ($kind === 'profile'): ?>
         <section class="profile-layout">
             <article class="profile-intro">
-                <div class="profile-avatar"><?php if (!empty($user['avatar'])): ?><img src="?download=avatar&amp;id=<?= (int) $user['id'] ?>" alt="Ảnh đại diện của <?= screen_escape($screenData['title']) ?>"><?php else: ?><?= screen_escape(screen_initial($screenData['title'])) ?><?php endif; ?></div>
+                <div class="profile-avatar"><?php if (!empty($user['avatar'])): ?><img src="<?= screen_escape(app_avatar_url($user)) ?>" alt="Ảnh đại diện của <?= screen_escape($screenData['title']) ?>"><?php else: ?><?= screen_escape(screen_initial($screenData['title'])) ?><?php endif; ?></div>
                 <p class="eyebrow">Hồ sơ đang hiển thị</p>
                 <h2><?= screen_escape($screenData['title']) ?></h2>
                 <p><?= screen_escape($screenData['description']) ?></p>
@@ -344,7 +443,7 @@ $primaryAction = $primaryActions[$screen] ?? null;
                 </div><label class="search-field"><span aria-hidden="true">⌕</span><input type="search" data-list-search placeholder="Tìm sinh viên" aria-label="Tìm sinh viên"></label>
             </div>
             <?php foreach ($screenData['members'] as $member): ?><article class="member-row" data-search-item>
-                    <div class="member-avatar"><?= screen_escape(screen_initial($member['name'])) ?></div>
+                    <div class="member-avatar"><?php if (!empty($member['avatar'])): ?><img src="<?= screen_escape(app_avatar_url(['user_id' => $member['user_id'], 'avatar' => $member['avatar']])) ?>" alt=""><?php else: ?><?= screen_escape(screen_initial($member['name'])) ?><?php endif; ?></div>
                     <div class="member-info"><strong><?= screen_escape($member['name']) ?></strong><span><?= screen_escape($member['detail']) ?></span></div>
                     <div class="member-progress">
                         <div class="member-progress-label"><span>Tiến độ</span><strong><?= (int) $member['progress'] ?>%</strong></div>
@@ -353,5 +452,4 @@ $primaryAction = $primaryActions[$screen] ?? null;
                 </article><?php endforeach; ?>
         </section>
     <?php endif; ?>
-    <p class="data-notice">Dữ liệu hiển thị theo quyền tài khoản đang đăng nhập.</p>
 </div>

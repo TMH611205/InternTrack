@@ -40,16 +40,16 @@ SELECT id, 'CT22-0079', 'female', 'Truyền thông số', 'DMC22A', 'Truyền th
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'NS-2021-018', 'Sông Lam Digital', 'https://northstar.studio', 'people@northstar.studio', '+842383220188', 'Đường Lê Nin, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, đồng hành cùng sinh viên trong các dự án sản phẩm số.', 'active' FROM users WHERE username = 'company'
+SELECT id, '0100000001', 'Sông Lam Digital', 'https://northstar.studio', 'people@northstar.studio', '+842383220188', 'Đường Lê Nin, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, đồng hành cùng sinh viên trong các dự án sản phẩm số.', 'active' FROM users WHERE username = 'company'
 ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'ML-2020-042', 'Nghệ An UX Lab', 'https://moclab.example', 'hello@moclab.example', '+842383220189', 'Đường Nguyễn Thị Minh Khai, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, nghiên cứu trải nghiệm cho sản phẩm giáo dục và cộng đồng.', 'active' FROM users WHERE username = 'moclab'
+SELECT id, '0100000002', 'Nghệ An UX Lab', 'https://moclab.example', 'hello@moclab.example', '+842383220189', 'Đường Nguyễn Thị Minh Khai, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, nghiên cứu trải nghiệm cho sản phẩm giáo dục và cộng đồng.', 'active' FROM users WHERE username = 'moclab'
 ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'MC-2024-011', 'Vinh Creative Studio', 'https://maycreative.example', 'careers@maycreative.example', '+842383220190', 'Đường Trường Thi, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, phát triển nhận diện thương hiệu và sản phẩm số.', 'active' FROM users WHERE username = 'maycreative'
+SELECT id, '0100000003', 'Vinh Creative Studio', 'https://maycreative.example', 'careers@maycreative.example', '+842383220190', 'Đường Trường Thi, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Vinh, phát triển nhận diện thương hiệu và sản phẩm số.', 'active' FROM users WHERE username = 'maycreative'
 ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
-SELECT id, 'LH-2023-028', 'Cửa Lò Media', 'https://lahouse.example', 'team@lahouse.example', '+842383220191', 'Đường Nguyễn Văn Cừ, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Nghệ An, xây dựng nội dung và giải pháp số cho bán lẻ.', 'active' FROM users WHERE username = 'lahouse'
+SELECT id, '0100000004', 'Cửa Lò Media', 'https://lahouse.example', 'team@lahouse.example', '+842383220191', 'Đường Nguyễn Văn Cừ, TP. Vinh, Nghệ An (địa chỉ mẫu)', 'Doanh nghiệp minh họa tại Nghệ An, xây dựng nội dung và giải pháp số cho bán lẻ.', 'active' FROM users WHERE username = 'lahouse'
 ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 
 INSERT INTO lecturers (user_id, lecturer_code, department, academic_title, specialization)
@@ -63,11 +63,11 @@ INSERT INTO positions (company_id, title, description, requirements, benefits, l
 SELECT c.id, seed.title, seed.description, seed.requirements, seed.benefits, seed.location, seed.quantity, seed.deadline, 'open'
 FROM companies c
 JOIN (
-    SELECT 'NS-2021-018' AS company_code, 'Product Design Intern' AS title, 'Thiết kế luồng onboarding cho nền tảng quản lý bán lẻ và kiểm chứng giải pháp với người dùng.' AS description, 'Sinh viên năm 3–4 ngành thiết kế hoặc công nghệ; có portfolio và tinh thần chủ động.' AS requirements, 'Có mentor đồng hành, hỗ trợ chi phí thực tập và cơ hội tham gia sản phẩm thật.' AS benefits, 'Hybrid · TP. Vinh, Nghệ An' AS location, 2 AS quantity, '2026-10-15' AS deadline
-    UNION ALL SELECT 'ML-2020-042', 'UX Research Intern', 'Tham gia nghiên cứu hành vi và kiểm thử sản phẩm giáo dục.', 'Sinh viên ngành UX, tâm lý học hoặc nghiên cứu; biết tổng hợp insight.', 'Mentor nghiên cứu, ngân sách phỏng vấn người dùng.', 'TP. Vinh, Nghệ An', 1, '2026-10-18'
-    UNION ALL SELECT 'NS-2021-018', 'Frontend Developer Intern', 'Xây dựng và kiểm thử giao diện web cùng nhóm sản phẩm.', 'Nắm HTML, CSS, JavaScript cơ bản; biết Git là lợi thế.', 'Code review hằng tuần, lịch làm việc linh hoạt.', 'TP. Vinh · Hybrid', 1, '2026-10-25'
-    UNION ALL SELECT 'LH-2023-028', 'Content Intern', 'Lên kế hoạch và viết nội dung cho sản phẩm bán lẻ.', 'Có khả năng viết rõ ràng, biết tìm hiểu người dùng.', 'Hướng dẫn nội dung và portfolio sau kỳ thực tập.', 'Từ xa · Doanh nghiệp tại TP. Vinh', 1, '2026-11-01'
-    UNION ALL SELECT 'MC-2024-011', 'Visual Designer Intern', 'Phát triển hệ thống hình ảnh cho thương hiệu và chiến dịch số.', 'Sinh viên thiết kế, có portfolio và kỹ năng Figma.', 'Tham gia dự án thực tế cùng đội ngũ sáng tạo.', 'TP. Vinh, Nghệ An', 1, '2026-11-05'
+    SELECT '0100000001' AS company_code, 'Product Design Intern' AS title, 'Thiết kế luồng onboarding cho nền tảng quản lý bán lẻ và kiểm chứng giải pháp với người dùng.' AS description, 'Sinh viên năm 3–4 ngành thiết kế hoặc công nghệ; có portfolio và tinh thần chủ động.' AS requirements, 'Có mentor đồng hành, hỗ trợ chi phí thực tập và cơ hội tham gia sản phẩm thật.' AS benefits, 'Hybrid · TP. Vinh, Nghệ An' AS location, 2 AS quantity, '2026-10-15' AS deadline
+    UNION ALL SELECT '0100000002', 'UX Research Intern', 'Tham gia nghiên cứu hành vi và kiểm thử sản phẩm giáo dục.', 'Sinh viên ngành UX, tâm lý học hoặc nghiên cứu; biết tổng hợp insight.', 'Mentor nghiên cứu, ngân sách phỏng vấn người dùng.', 'TP. Vinh, Nghệ An', 1, '2026-10-18'
+    UNION ALL SELECT '0100000001', 'Frontend Developer Intern', 'Xây dựng và kiểm thử giao diện web cùng nhóm sản phẩm.', 'Nắm HTML, CSS, JavaScript cơ bản; biết Git là lợi thế.', 'Code review hằng tuần, lịch làm việc linh hoạt.', 'TP. Vinh · Hybrid', 1, '2026-10-25'
+    UNION ALL SELECT '0100000004', 'Content Intern', 'Lên kế hoạch và viết nội dung cho sản phẩm bán lẻ.', 'Có khả năng viết rõ ràng, biết tìm hiểu người dùng.', 'Hướng dẫn nội dung và portfolio sau kỳ thực tập.', 'Từ xa · Doanh nghiệp tại TP. Vinh', 1, '2026-11-01'
+    UNION ALL SELECT '0100000003', 'Visual Designer Intern', 'Phát triển hệ thống hình ảnh cho thương hiệu và chiến dịch số.', 'Sinh viên thiết kế, có portfolio và kỹ năng Figma.', 'Tham gia dự án thực tế cùng đội ngũ sáng tạo.', 'TP. Vinh, Nghệ An', 1, '2026-11-05'
 ) AS seed ON seed.company_code = c.company_code
 WHERE c.status = 'active'
   AND NOT EXISTS (SELECT 1 FROM positions p WHERE p.company_id = c.id AND p.title = seed.title);
@@ -75,17 +75,17 @@ WHERE c.status = 'active'
 UPDATE positions p
 JOIN companies c ON c.id = p.company_id
 SET p.location = CASE
-    WHEN c.company_code = 'NS-2021-018' AND p.title = 'Product Design Intern' THEN 'Hybrid · TP. Vinh, Nghệ An'
-    WHEN c.company_code = 'ML-2020-042' AND p.title = 'UX Research Intern' THEN 'TP. Vinh, Nghệ An'
-    WHEN c.company_code = 'NS-2021-018' AND p.title = 'Frontend Developer Intern' THEN 'TP. Vinh · Hybrid'
-    WHEN c.company_code = 'LH-2023-028' AND p.title = 'Content Intern' THEN 'Từ xa · Doanh nghiệp tại TP. Vinh'
-    WHEN c.company_code = 'MC-2024-011' AND p.title = 'Visual Designer Intern' THEN 'TP. Vinh, Nghệ An'
+    WHEN c.company_code = '0100000001' AND p.title = 'Product Design Intern' THEN 'Hybrid · TP. Vinh, Nghệ An'
+    WHEN c.company_code = '0100000002' AND p.title = 'UX Research Intern' THEN 'TP. Vinh, Nghệ An'
+    WHEN c.company_code = '0100000001' AND p.title = 'Frontend Developer Intern' THEN 'TP. Vinh · Hybrid'
+    WHEN c.company_code = '0100000004' AND p.title = 'Content Intern' THEN 'Từ xa · Doanh nghiệp tại TP. Vinh'
+    WHEN c.company_code = '0100000003' AND p.title = 'Visual Designer Intern' THEN 'TP. Vinh, Nghệ An'
     ELSE p.location
 END
-WHERE (c.company_code = 'NS-2021-018' AND p.title IN ('Product Design Intern', 'Frontend Developer Intern'))
-   OR (c.company_code = 'ML-2020-042' AND p.title = 'UX Research Intern')
-   OR (c.company_code = 'LH-2023-028' AND p.title = 'Content Intern')
-   OR (c.company_code = 'MC-2024-011' AND p.title = 'Visual Designer Intern');
+WHERE (c.company_code = '0100000001' AND p.title IN ('Product Design Intern', 'Frontend Developer Intern'))
+   OR (c.company_code = '0100000002' AND p.title = 'UX Research Intern')
+   OR (c.company_code = '0100000004' AND p.title = 'Content Intern')
+   OR (c.company_code = '0100000003' AND p.title = 'Visual Designer Intern');
 
 UPDATE students s
 JOIN users u ON u.id = s.user_id
@@ -96,7 +96,7 @@ INSERT INTO internships (student_id, company_id, position_id, lecturer_id, start
 SELECT s.id, c.id, p.id, l.id, '2026-09-01', '2026-11-25', 'active', 'Thiết kế trải nghiệm onboarding và kiểm chứng giải pháp qua thử nghiệm người dùng.'
 FROM students s
 JOIN users su ON su.id = s.user_id AND su.username = 'student'
-JOIN companies c ON c.company_code = 'NS-2021-018'
+JOIN companies c ON c.company_code = '0100000001'
 JOIN positions p ON p.company_id = c.id AND p.title = 'Product Design Intern'
 JOIN lecturers l ON l.lecturer_code = 'GV-UX-001'
 WHERE NOT EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND i.position_id = p.id AND i.start_date = '2026-09-01');
@@ -104,7 +104,7 @@ INSERT INTO internships (student_id, company_id, position_id, lecturer_id, start
 SELECT s.id, c.id, p.id, l.id, '2026-01-06', '2026-03-28', '2026-03-27', 'completed', 'Hỗ trợ nghiên cứu và thiết kế trải nghiệm học tập.', 89.00
 FROM students s
 JOIN users su ON su.id = s.user_id AND su.username = 'bao'
-JOIN companies c ON c.company_code = 'ML-2020-042'
+JOIN companies c ON c.company_code = '0100000002'
 JOIN positions p ON p.company_id = c.id AND p.title = 'UX Research Intern'
 JOIN lecturers l ON l.lecturer_code = 'GV-SE-014'
 WHERE NOT EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND i.position_id = p.id AND i.start_date = '2026-01-06');

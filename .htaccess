@@ -1,0 +1,9 @@
+# Chặn truy cập trực tiếp tới tệp cấu hình, SQL, tài liệu và thông tin phụ thuộc.
+<FilesMatch "^\.|\.(env|sql|md|lock|json|log|ini|example)$">
+    Require all denied
+</FilesMatch>
+
+# Chặn các thư mục chỉ chứa mã nguồn nội bộ; ứng dụng luôn đi qua index.php.
+RedirectMatch 403 ^/(?:[^/]+/)?(?:config|controllers|models|views|database|vendor|\.git)(?:/|$)
+
+Options -Indexes

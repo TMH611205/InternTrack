@@ -233,3 +233,114 @@
     }
   });
 })();
+
+// Đồng hồ ngày giờ ở thanh trên cùng (múi giờ Việt Nam).
+(() => {
+  const dateEl = document.querySelector("[data-clock-date]");
+  const timeEl = document.querySelector("[data-clock-time]");
+  if (!dateEl || !timeEl) return;
+  const zone = { timeZone: "Asia/Ho_Chi_Minh" };
+  const dateFormat = new Intl.DateTimeFormat("vi-VN", {
+    ...zone,
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const timeFormat = new Intl.DateTimeFormat("vi-VN", {
+    ...zone,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const tick = () => {
+    const now = new Date();
+    const date = dateFormat.format(now);
+    dateEl.textContent = date.charAt(0).toUpperCase() + date.slice(1);
+    timeEl.textContent = timeFormat.format(now);
+  };
+  tick();
+  window.setInterval(tick, 1000);
+})();
+
+// Nút trỏ tới bảng thao tác (<details id="...">) sẽ mở bảng đó rồi cuộn tới.
+(() => {
+  const openPanel = (hash) => {
+    if (!hash || hash.length < 2) return false;
+    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (!target) return false;
+    if (target.tagName === "DIALOG") {
+      if (typeof target.showModal === "function" && !target.open) target.showModal();
+      target.querySelector("input:not([type=hidden]), textarea, select")?.focus();
+      return true;
+    }
+    if (target.tagName !== "DETAILS") return false;
+    target.open = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.querySelector("input:not([type=hidden]), textarea, select")?.focus({ preventScroll: true });
+    return true;
+  };
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link && openPanel(link.getAttribute("href"))) event.preventDefault();
+  });
+  window.addEventListener("load", () => openPanel(window.location.hash));
+})();
+
+// Chuông thông báo: mở/đóng bảng thả xuống, đóng khi bấm ra ngoài hoặc nhấn Escape.
+(() => {
+  const root = document.querySelector("[data-notification-root]");
+  if (!root) return;
+  const toggle = root.querySelector("[data-notification-toggle]");
+  const panel = root.querySelector("[data-notification-panel]");
+  const setOpen = (open) => {
+    panel.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+  };
+  toggle.addEventListener("click", () => setOpen(panel.hidden));
+  document.addEventListener("click", (event) => {
+    if (!root.contains(event.target)) setOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setOpen(false);
+  });
+})();
+
+// Form tạo tài khoản: chỉ hiện các trường theo vai trò đang chọn.
+(() => {
+  const form = document.querySelector("[data-role-form]");
+  const select = form?.querySelector("[data-role-select]");
+  if (!form || !select) return;
+  const sync = () => {
+    form.querySelectorAll("[data-role-field]").forEach((field) => {
+      field.hidden = field.dataset.roleField !== select.value;
+    });
+    form.querySelectorAll("[data-required-for]").forEach((input) => {
+      input.required = input.dataset.requiredFor === select.value;
+    });
+  };
+  select.addEventListener("change", sync);
+  sync();
+})();
+
+// Hộp thoại nổi: mở bằng [data-dialog-open], đóng bằng [data-dialog-close], bấm nền tối hoặc Escape.
+(() => {
+  document.addEventListener("click", (event) => {
+    const opener = event.target.closest("[data-dialog-open]");
+    if (opener) {
+      const dialog = document.getElementById(opener.dataset.dialogOpen);
+      if (dialog && typeof dialog.showModal === "function") {
+        dialog.showModal();
+        dialog.querySelector("input:not([type=hidden]), textarea, select")?.focus();
+      }
+      return;
+    }
+    if (event.target.closest("[data-dialog-close]")) {
+      event.target.closest("dialog")?.close();
+      return;
+    }
+    // Bấm vào vùng nền tối (chính là phần tử dialog) thì đóng.
+    if (event.target instanceof HTMLDialogElement && event.target.open) event.target.close();
+  });
+})();

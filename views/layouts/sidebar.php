@@ -6,7 +6,11 @@ $screenData = is_array($screenData ?? null) ? $screenData : [];
 $user = is_array($user ?? null) ? $user : [];
 $screenData += ['role' => 'student', 'active' => '',];
 $user += ['full_name' => 'Người dùng', 'avatar' => null, 'id' => 0];
+
+// Menu điều hướng theo vai trò. Mỗi mục: key (khớp "active" trong page-data.php), nhãn, trang đích và icon (xem ui_icon trong config/app.php).
 $navigation = [
+
+    // Menu sinh viên.
     'student' => [
         ['key' => 'dashboard', 'label' => 'Tổng quan', 'page' => 'student/dashboard', 'icon' => 'home'],
         ['key' => 'internships', 'label' => 'Cơ hội thực tập', 'page' => 'student/internships', 'icon' => 'compass'],
@@ -17,6 +21,8 @@ $navigation = [
         ['key' => 'evaluation', 'label' => 'Đánh giá', 'page' => 'student/evaluation', 'icon' => 'star'],
         ['key' => 'profile', 'label' => 'Hồ sơ cá nhân', 'page' => 'student/profile', 'icon' => 'user'],
     ],
+
+    // Menu doanh nghiệp.
     'company' => [
         ['key' => 'dashboard', 'label' => 'Tổng quan', 'page' => 'company/dashboard', 'icon' => 'home'],
         ['key' => 'applications', 'label' => 'Hồ sơ ứng tuyển', 'page' => 'company/applications', 'icon' => 'inbox'],
@@ -27,6 +33,8 @@ $navigation = [
         ['key' => 'evaluations', 'label' => 'Đánh giá', 'page' => 'company/evaluations', 'icon' => 'star'],
         ['key' => 'profile', 'label' => 'Hồ sơ doanh nghiệp', 'page' => 'company/profile', 'icon' => 'building'],
     ],
+
+    // Menu giảng viên.
     'lecturer' => [
         ['key' => 'dashboard', 'label' => 'Tổng quan', 'page' => 'lecturer/dashboard', 'icon' => 'home'],
         ['key' => 'students', 'label' => 'Sinh viên', 'page' => 'lecturer/students', 'icon' => 'cap'],
@@ -36,6 +44,8 @@ $navigation = [
         ['key' => 'evaluations', 'label' => 'Đánh giá', 'page' => 'lecturer/evaluations', 'icon' => 'star'],
         ['key' => 'profile', 'label' => 'Hồ sơ cá nhân', 'page' => 'lecturer/profile', 'icon' => 'user'],
     ],
+
+    // Menu quản trị viên.
     'admin' => [
         ['key' => 'dashboard', 'label' => 'Tổng quan', 'page' => 'admin/dashboard', 'icon' => 'home'],
         ['key' => 'students', 'label' => 'Sinh viên', 'page' => 'admin/students', 'icon' => 'cap'],
@@ -49,15 +59,21 @@ $navigation = [
 ];
 $roleNames = ['student' => 'Sinh viên', 'company' => 'Doanh nghiệp', 'lecturer' => 'Giảng viên', 'admin' => 'Quản trị'];
 $role = $screenData['role'];
+
+// Trang hồ sơ cá nhân của từng vai trò (liên kết ở khung tài khoản cuối menu).
 $accountPage = ['student' => 'student/profile', 'company' => 'company/profile', 'lecturer' => 'lecturer/profile', 'admin' => 'admin/profile'][$role];
 ?>
 <!-- Sidebar là trung tâm điều hướng của ứng dụng, hiển thị menu theo vai trò và nút đăng xuất -->
+
+<?php // Cột menu bên trái: logo, tên vai trò, danh sách mục, thẻ học kỳ, tài khoản và nút đăng xuất. ?>
 <aside class="sidebar" id="app-sidebar">
     <a class="brand" href="?page=<?= screen_escape($role) ?>/dashboard" aria-label="InternTrack, về tổng quan">
         <img class="brand-mark" src="assets/images/logo-mark.svg" alt="" width="40" height="24"><span class="brand-name">Intern<span>Track</span></span>
     </a>
     <div class="workspace-switcher"><span class="workspace-glyph"><?= screen_escape(screen_initial($roleNames[$role])) ?></span><span><small>KHÔNG GIAN</small><strong><?= screen_escape($roleNames[$role]) ?></strong></span><span class="switcher-arrow"><?= ui_icon('chevron-down') ?></span></div>
     <p class="nav-label">MENU CHÍNH</p>
+
+    <?php // Danh sách mục menu của vai trò hiện tại; mục đang mở được đánh dấu và hiện chấm đỏ nếu có thông báo chưa đọc. ?>
     <nav class="primary-nav" aria-label="Điều hướng chính">
         <?php foreach ($navigation[$role] as $item): ?>
             <a class="nav-link <?= $screenData['active'] === $item['key'] ? 'is-active' : '' ?>" href="?page=<?= screen_escape($item['page']) ?>" <?= $screenData['active'] === $item['key'] ? 'aria-current="page"' : '' ?>>
@@ -66,6 +82,8 @@ $accountPage = ['student' => 'student/profile', 'company' => 'company/profile', 
             </a>
         <?php endforeach; ?>
     </nav>
+
+    <?php // Phần cuối menu: thẻ học kỳ, tài khoản người dùng và đăng xuất. ?>
     <div class="sidebar-bottom">
         <div class="term-card"><span class="term-dot"></span>
             <div><small>CHƯƠNG TRÌNH</small><strong>Thực tập 2026–27</strong></div><span class="term-arrow"><?= ui_icon('arrow-up-right') ?></span>

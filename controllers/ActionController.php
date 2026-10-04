@@ -57,6 +57,31 @@ function action_internship(int $internshipId, array $user): array
     return $internship;
 }
 
+// Tính điểm tổng kết từ đánh giá ĐÃ GỬI của doanh nghiệp và giảng viên; thiếu một bên thì trả null (chưa được hoàn thành kỳ).
+function action_final_score(int $internshipId): ?float
+{
+    $scores = [];
+    foreach (page_all('SELECT evaluator_type, overall_score FROM evaluations WHERE internship_id = ? AND status = \'submitted\' AND overall_score IS NOT NULL', [$internshipId]) as $row) {
+        $scores[$row['evaluator_type']][] = (float) $row['overall_score'];
+    }
+    $total = 0.0;
+    foreach (FINAL_SCORE_WEIGHTS as $type => $weight) {
+        if (empty($scores[$type])) {
+            return null;
+        }
+        $total += $weight * (array_sum($scores[$type]) / count($scores[$type]));
+    }
+    return round($total, 2);
+}
+
+// Kỳ thực tập đã hoàn thành hoặc đã hủy thì khóa mọi thao tác ghi để điểm và hồ sơ không bị thay đổi sau khi chốt.
+function action_require_open_internship(array $internship): void
+{
+    if (!in_array($internship['status'], ['planned', 'active'], true)) {
+        throw new DomainException('Kỳ thực tập đã kết thúc hoặc đã hủy nên không thể thay đổi.');
+    }
+}
+
 function action_require_company_address(int $companyId): void
 {
     $company = page_one('SELECT address FROM companies WHERE id = ?', [$companyId]);
@@ -536,6 +561,7 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (!$internship) {
                 throw new DomainException('Hãy chọn một kỳ thực tập được phân công.');
             }
+            action_require_open_internship($internship);
             $title = action_value($input, 'title', 200);
             $priority = action_value($input, 'priority', 20) ?: 'medium';
             if ($title === '' || !in_array($priority, ['low', 'medium', 'high', 'urgent'], true)) {
@@ -591,7 +617,7 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (!in_array($status, ['todo', 'in_progress', 'submitted', 'completed', 'cancelled'], true)) {
                 throw new DomainException('Trạng thái nhiệm vụ không hợp lệ.');
             }
-            $task = page_one('SELECT t.*, i.company_id, i.lecturer_id FROM tasks t JOIN internships i ON i.id = t.internship_id WHERE t.id = ?', [$taskId]);
+            $task = page_one('SELECT t.*, i.company_id, i.lecturer_id, i.status AS internship_status FROM tasks t JOIN internships i ON i.id = t.internship_id WHERE t.id = ?', [$taskId]);
             if (!$task) {
                 throw new DomainException('Không tìm thấy nhiệm vụ.');
             }
@@ -603,6 +629,9 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             };
             if (!$allowed) {
                 throw new DomainException('Bạn không có quyền cập nhật nhiệm vụ này.');
+            }
+            if ($user['role'] === 'student') {
+                action_require_open_internship(['status' => $task['internship_status']]);
             }
             if ($user['role'] === 'student' && in_array($task['status'], ['completed', 'cancelled'], true)) {
                 throw new DomainException('Nhiệm vụ đã được đóng nên không thể cập nhật.');
@@ -703,6 +732,7 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (!$internshipId || !action_internship($internshipId, $user)) {
                 throw new DomainException('Không tìm thấy kỳ thực tập.');
             }
+            action_require_open_internship(action_internship($internshipId, $user));
             $type = action_value($input, 'report_type', 20);
             $title = action_value($input, 'title', 255);
             $content = action_value($input, 'content', 20000);
@@ -753,6 +783,7 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (!$internship) {
                 throw new DomainException('Không tìm thấy kỳ thực tập để đánh giá.');
             }
+            action_require_open_internship($internship);
             $scores = [];
             foreach (['technical_score', 'attitude_score', 'communication_score', 'discipline_score'] as $field) {
                 $score = filter_var($input[$field] ?? null, FILTER_VALIDATE_FLOAT);
@@ -857,6 +888,21 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $lecturerId = $assignLecturer ? (filter_var($input['lecturer_id'], FILTER_VALIDATE_INT) ?: null) : null;
             // Kế hoạch thực tập do nhà trường phân công: chỉ quản trị viên được sửa; các vai trò khác chỉ xem.
             $trainingPlan = $user['role'] === 'admin' && array_key_exists('training_plan', $input) ? action_value($input, 'training_plan', 20000) : null;
+            // Thời gian và mô tả kỳ thực tập: chỉ quản trị viên được chỉnh sửa.
+            $newStartDate = $newEndDate = $newDescription = null;
+            if ($user['role'] === 'admin' && array_key_exists('start_date', $input)) {
+                $newStartDate = action_value($input, 'start_date', 10);
+                $newEndDate = action_value($input, 'end_date', 10);
+                foreach ([$newStartDate, $newEndDate] as $date) {
+                    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1 || !strtotime($date)) {
+                        throw new DomainException('Ngày bắt đầu và ngày kết thúc kỳ thực tập không hợp lệ.');
+                    }
+                }
+                if ($newEndDate < $newStartDate) {
+                    throw new DomainException('Ngày kết thúc không được trước ngày bắt đầu.');
+                }
+                $newDescription = action_value($input, 'description', 5000);
+            }
             if (!in_array($status, ['planned', 'active', 'completed', 'cancelled'], true)) {
                 throw new DomainException('Trạng thái kỳ thực tập không hợp lệ.');
             }
@@ -879,6 +925,31 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                 $oldStatus = $internship['status'];
                 $setParts = ['status = ?'];
                 $parameters = [$status];
+                if ($newStartDate !== null) {
+                    $current = page_one('SELECT student_id, position_id, actual_end_date FROM internships WHERE id = ?', [$internshipId]);
+                    if (!empty($current['actual_end_date']) && $newStartDate > $current['actual_end_date']) {
+                        throw new DomainException('Ngày bắt đầu không được sau ngày kết thúc thực tế (' . date('d/m/Y', (int) strtotime($current['actual_end_date'])) . ').');
+                    }
+                    if (page_count('SELECT COUNT(*) FROM internships WHERE student_id = ? AND position_id = ? AND start_date = ? AND id <> ?', [$current['student_id'], $current['position_id'], $newStartDate, $internshipId]) > 0) {
+                        throw new DomainException('Sinh viên đã có kỳ thực tập cùng vị trí bắt đầu vào ngày này.');
+                    }
+                    array_push($setParts, 'start_date = ?', 'end_date = ?', 'description = ?');
+                    array_push($parameters, $newStartDate, $newEndDate, $newDescription === '' ? null : $newDescription);
+                }
+                // Hoàn thành kỳ = chốt điểm: cần đủ đánh giá của doanh nghiệp và giảng viên; mở lại kỳ thì xóa điểm đã chốt.
+                $finalScore = null;
+                if ($status === 'completed' && $oldStatus !== 'completed') {
+                    $finalScore = action_final_score((int) $internshipId);
+                    if ($finalScore === null) {
+                        throw new DomainException('Chưa thể hoàn thành kỳ thực tập: cần đủ đánh giá đã gửi của cả doanh nghiệp và giảng viên.');
+                    }
+                    $setParts[] = 'final_score = ?';
+                    $parameters[] = $finalScore;
+                    $setParts[] = 'actual_end_date = CURDATE()';
+                } elseif ($status !== 'completed' && $oldStatus === 'completed') {
+                    $setParts[] = 'final_score = NULL';
+                    $setParts[] = 'actual_end_date = NULL';
+                }
                 if ($assignLecturer) {
                     $setParts[] = 'lecturer_id = ?';
                     $parameters[] = $lecturerId;
@@ -899,6 +970,14 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     $connection->rollBack();
                 }
                 throw $error;
+            }
+            if ($finalScore !== null) {
+                $resultText = $finalScore >= FINAL_PASS_SCORE ? 'Đạt' : 'Chưa đạt';
+                $finishedInternship = page_one('SELECT student_id, company_id FROM internships WHERE id = ?', [$internshipId]);
+                if ($finishedInternship) {
+                    notify_student((int) $finishedInternship['student_id'], 'evaluation', 'Kỳ thực tập đã hoàn thành', 'Điểm tổng kết của bạn là ' . $finalScore . '/100 (' . $resultText . ').', 'student/evaluation');
+                    notify_company((int) $finishedInternship['company_id'], 'evaluations', 'Kỳ thực tập đã chốt điểm', 'Một kỳ thực tập đã hoàn thành với điểm tổng kết ' . $finalScore . '/100.', 'company/evaluations');
+                }
             }
             if ($assignLecturer && $lecturerId !== null && (int) ($internship['lecturer_id'] ?? 0) !== $lecturerId) {
                 notify_lecturer($lecturerId, 'students', 'Được phân công sinh viên mới', 'Bạn được phân công phụ trách một kỳ thực tập mới.', 'lecturer/students');

@@ -647,9 +647,63 @@ p {
   flex-wrap: wrap;
   gap: 6px;
 }
-.review-actions button:last-child {
+.review-actions button[value="rejected"] {
   border-color: #eed0c8;
   color: #a64f3b;
+}
+
+/* Thẻ báo cáo của giảng viên: nút duyệt đủ lớn, nút AI không kéo giãn hết chiều ngang thẻ */
+.opportunity-card .review-actions button {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+/* Hàng thao tác trong bảng: ô chọn và các nút cùng chiều cao, cỡ chữ, bo góc để cân đối */
+.row-actions .inline-action {
+  gap: 8px;
+}
+.row-actions .inline-action > select,
+.row-actions .inline-action > button {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+}
+.row-actions .inline-action > select {
+  flex: 1 1 auto;
+  padding: 0 10px;
+}
+.row-actions .inline-action > button {
+  flex: 0 0 auto;
+  min-width: 56px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+.row-actions .inline-action > .ai-button {
+  min-width: 76px;
+  border-color: #b8d6c0;
+  background: #f1f8f3;
+}
+.row-actions .inline-action > .ai-button--warn {
+  border-color: #e8b8aa;
+  background: #fdf0ec;
+  color: #a64f3b;
+}
+.review-actions .ai-button {
+  margin-left: auto;
+  border-color: #b8d6c0;
+  background: #f1f8f3;
+}
+.review-actions .ai-button--warn {
+  border-color: #e8b8aa;
+  background: #fdf0ec;
+  color: #a64f3b;
+}
+.opportunity-card > .review-card-form {
+  margin-top: 12px;
 }
 .sidebar-account {
   padding-top: 7px;
@@ -2690,6 +2744,7 @@ dialog.modal {
   width: min(540px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   padding: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   border: 0;
   border-radius: 12px;
@@ -2720,6 +2775,7 @@ dialog.modal[open] {
   }
 }
 .modal-form {
+  grid-template-columns: minmax(0, 1fr);
   padding: 22px 24px 24px;
 }
 .modal-head {
@@ -2835,6 +2891,16 @@ dialog.modal .modal-actions {
 .table-edit-button:hover {
   border-color: var(--green);
   background: var(--green-pale);
+}
+
+/* Ô thao tác trong bảng: các nút cùng chiều rộng, thẳng hàng giữa các dòng dù nhãn dài ngắn khác nhau */
+.row-actions {
+  white-space: nowrap;
+}
+.row-actions > .table-edit-button {
+  min-width: 112px;
+  margin-right: 6px;
+  vertical-align: middle;
 }
 .modal-sub {
   margin: 4px 0 0;
@@ -3405,7 +3471,9 @@ dialog.modal .modal-actions {
 }
 .ai-result {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+  min-width: 0;
 }
 .ai-result-head {
   display: flex;
@@ -3457,7 +3525,9 @@ dialog.modal .modal-actions {
   overflow-y: auto;
 }
 .ai-final-text {
+  display: block;
   width: 100%;
+  max-width: 100%;
   padding: 10px;
   border: 1px solid var(--line);
   background: #fbfcfa;

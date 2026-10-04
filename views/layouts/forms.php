@@ -7,10 +7,15 @@ $user = is_array($user ?? null) ? $user : [];
 $screenData = is_array($screenData ?? null) ? $screenData : [];
 $user += ['full_name' => 'Người dùng', 'phone' => '', 'email' => ''];
 $screenData += ['internship_id' => null, 'internship_options' => [], 'profile_record' => []];
+
+// Trường CSRF ẩn: BẮT BUỘC có trong mọi form POST (index.php sẽ từ chối nếu thiếu).
 $csrfField = '<input type="hidden" name="_csrf" value="' . screen_escape(app_csrf_token()) . '">';
+
+// Địa chỉ gửi form: luôn quay lại đúng màn hình hiện tại (giữ nhóm tài khoản ở admin/users).
 $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !empty($screenData['group']) ? '&group=' . rawurlencode($screenData['group']) : '');
 ?>
 <?php if ($screen === 'company/positions'): ?>
+    <?php // [Doanh nghiệp · Vị trí tuyển] Nút và hộp thoại đăng vị trí tuyển dụng mới (action=position_save). ?>
     <button type="button" class="action-trigger" data-dialog-open="new-position"><span>+ Đăng vị trí mới</span><small>Tạo tin tuyển dụng cho doanh nghiệp</small></button>
     <dialog class="modal" id="new-position" aria-label="Đăng vị trí mới">
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -30,6 +35,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'company/tasks' && !empty($screenData['internship_options'])): ?>
+    <?php // [Doanh nghiệp · Nhiệm vụ] Giao nhiệm vụ mới cho thực tập sinh (action=task_create). ?>
     <button type="button" class="action-trigger" data-dialog-open="new-task"><span>+ Giao nhiệm vụ</span><small>Gắn nhiệm vụ với một kỳ thực tập</small></button>
     <dialog class="modal" id="new-task" aria-label="Giao nhiệm vụ">
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -49,6 +55,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'student/diary' && !empty($screenData['internship_id'])): ?>
+    <?php // [Sinh viên · Nhật ký] Ghi nhật ký (lưu nháp hoặc gửi giảng viên duyệt). ?>
     <button type="button" class="action-trigger" data-dialog-open="new-diary"><span>+ Ghi nhật ký</span><small>Lưu nháp hoặc gửi giảng viên duyệt</small></button>
     <dialog class="modal" id="new-diary" aria-label="Ghi nhật ký">
         <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -65,8 +72,10 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'student/diary'): ?>
+    <?php // [Sinh viên · Nhật ký] Chưa có kỳ thực tập nên chưa viết được nhật ký: chỉ hiện lời nhắc. ?>
     <p class="flash-message">Bạn chưa có kỳ thực tập đang diễn ra nên chưa thể viết nhật ký. Hãy ứng tuyển và chờ doanh nghiệp nhận hồ sơ; nhật ký sẽ mở khi kỳ thực tập được tạo. <a href="?page=student/internships">Xem cơ hội thực tập</a></p>
 <?php elseif ($screen === 'student/reports' && !empty($screenData['internship_id'])): ?>
+    <?php // [Sinh viên · Báo cáo] Tạo báo cáo (đề cương, giữa kỳ, cuối kỳ). ?>
     <button type="button" class="action-trigger" data-dialog-open="form-modal-4"><span>+ Tạo báo cáo</span><small>Đề cương, giữa kỳ hoặc cuối kỳ</small></button>
     <dialog class="modal" id="form-modal-4" aria-label="Tạo báo cáo">
         <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -88,6 +97,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'student/profile'): ?>
+    <?php // [Sinh viên · Hồ sơ] Chỉnh sửa hồ sơ, tải CV và ảnh đại diện. ?>
     <button type="button" class="action-trigger" data-dialog-open="profile-edit-1"><span>Chỉnh sửa hồ sơ</span><small>Cập nhật thông tin liên hệ và giới thiệu</small></button>
     <dialog class="modal" id="profile-edit-1" aria-label="Chỉnh sửa hồ sơ">
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -101,6 +111,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'company/profile'): ?>
+    <?php // [Doanh nghiệp · Hồ sơ] Chỉnh sửa thông tin liên hệ và giới thiệu doanh nghiệp. ?>
     <button type="button" class="action-trigger" data-dialog-open="profile-edit-2"><span>Chỉnh sửa thông tin doanh nghiệp</span><small>Cập nhật liên hệ và phần giới thiệu</small></button>
     <dialog class="modal" id="profile-edit-2" aria-label="Chỉnh sửa thông tin doanh nghiệp">
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -113,6 +124,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif (in_array($screen, ['lecturer/profile', 'admin/profile'], true)): ?>
+    <?php // [Giảng viên / Quản trị · Hồ sơ] Chỉnh sửa họ tên, số điện thoại, bộ môn và ảnh đại diện. ?>
     <button type="button" class="action-trigger" data-dialog-open="profile-edit-3"><span>Chỉnh sửa hồ sơ</span><small>Cập nhật thông tin liên hệ và ảnh đại diện</small></button>
     <dialog class="modal" id="profile-edit-3" aria-label="Chỉnh sửa hồ sơ">
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -125,6 +137,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'admin/documents'): ?>
+    <?php // [Quản trị · Tài liệu khoa] Thêm tài liệu cho trợ lý hỏi đáp (nhập văn bản hoặc tải .txt/.md). ?>
     <button type="button" class="action-trigger" data-dialog-open="form-modal-kb"><span>+ Thêm tài liệu</span><small>Quy định, mốc thời gian, biểu mẫu thực tập</small></button>
     <dialog class="modal" id="form-modal-kb" aria-label="Thêm tài liệu">
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
@@ -138,6 +151,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'admin/users' && ($screenData['group'] ?? 'student') !== 'admin'): ?>
+    <?php // [Quản trị · Tài khoản] Tạo tài khoản sinh viên / giảng viên / doanh nghiệp (action=user_create). ?>
     <?php
     $createRole = in_array($screenData['group'] ?? '', ['student', 'lecturer', 'company'], true) ? $screenData['group'] : 'student';
     $roleFieldAttr = static fn(string $role): string => 'data-role-field="' . $role . '"' . ($role === $createRole ? '' : ' hidden');

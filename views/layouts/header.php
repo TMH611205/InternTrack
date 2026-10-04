@@ -19,6 +19,8 @@ $role = $screenData['role'];
 $pageTitle = (string) ($screenData['title'] ?? 'InternTrack');
 $pageDescription = (string) ($screenData['description'] ?? 'Hệ thống quản lý kỳ thực tập chuyên nghiệp cho sinh viên, doanh nghiệp và giảng viên.');
 ?>
+
+<?php // Phần đầu tài liệu HTML: thẻ meta (SEO), tiêu đề, favicon, font và CSS. ?>
 <!doctype html>
 <html lang="vi">
 
@@ -43,9 +45,15 @@ $pageDescription = (string) ($screenData['description'] ?? 'Hệ thống quản 
 </head>
 
 <body>
+
+    <?php // Khung ứng dụng: sidebar bên trái + vùng nội dung bên phải (đóng ở footer.php). ?>
     <div class="app-shell">
+
+        <?php // Menu điều hướng bên trái (sidebar.php). ?>
         <?php require __DIR__ . '/sidebar.php'; ?>
         <main class="main-area">
+
+            <?php // Thanh trên cùng: nút mở menu (mobile), đường dẫn, học kỳ, đồng hồ, chuông thông báo và tài khoản. ?>
             <header class="topbar">
                 <button class="mobile-menu-button" type="button" aria-label="Mở menu" aria-controls="app-sidebar" data-sidebar-toggle><span></span><span></span></button>
                 <div class="breadcrumb"><span>InternTrack</span><span class="breadcrumb-slash">/</span><strong><?= screen_escape($screenData['title']) ?></strong></div>

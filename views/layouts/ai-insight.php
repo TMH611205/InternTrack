@@ -6,16 +6,20 @@ declare(strict_types=1);
 // Mọi giá trị đều được escape; dữ liệu do AI sinh ra không bao giờ được chèn thô vào HTML.
 
 if (!function_exists('ai_e')) {
+
+    // Escape HTML cho nội dung AI sinh ra (không bao giờ chèn thô vào trang).
     function ai_e(mixed $value): string
     {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
+    // Màu huy hiệu của cờ cảnh báo: "Tốt" xanh, còn lại cảnh báo.
     function ai_flag_class(string $flag): string
     {
         return $flag === 'Tốt' ? 'badge--positive' : 'badge--attention';
     }
 
+    // Có cờ cảnh báo nào ngoài "Tốt" không (dùng để tô đỏ nút AI).
     function ai_review_has_problem(?array $insight): bool
     {
         return $insight !== null && array_diff((array) ($insight['flags'] ?? []), ['Tốt']) !== [];
@@ -41,16 +45,19 @@ if (!function_exists('ai_e')) {
         return $html . '<p class="ai-meta">AI chấm sơ bộ, giảng viên quyết định cuối cùng · ' . ai_e($insight['updated_at'] ?? '') . '</p></div>';
     }
 
+    // Nhãn tiếng Việt của mức nguy cơ (high / medium / low).
     function ai_risk_label(string $level): string
     {
         return ['high' => 'Nguy cơ cao', 'medium' => 'Cần theo dõi', 'low' => 'Ổn định'][$level] ?? 'Ổn định';
     }
 
+    // Màu huy hiệu của mức nguy cơ.
     function ai_risk_class(string $level): string
     {
         return ['high' => 'badge--attention', 'medium' => 'badge--waiting', 'low' => 'badge--positive'][$level] ?? 'badge--neutral';
     }
 
+    // Nhận xét cuối kỳ do AI soạn (khung văn bản chỉ đọc + điểm mạnh / cần cải thiện).
     function ai_final_html(?array $insight): string
     {
         if ($insight === null) {

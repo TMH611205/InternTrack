@@ -16,6 +16,8 @@ $authEscape = static fn($value): string => htmlspecialchars((string) $value, ENT
 $authPageTitle = $isReset ? 'Đặt lại mật khẩu' : ($isForgot ? 'Khôi phục mật khẩu' : 'Đăng nhập');
 $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệp và giảng viên quản lý thực tập hiệu quả, an toàn và dễ theo dõi.';
 ?>
+
+<?php // Trang xác thực: đăng nhập, quên mật khẩu, nhập OTP và tạo mật khẩu mới (không dùng chung header/sidebar). ?>
 <!doctype html>
 <html lang="vi">
 
@@ -38,7 +40,11 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
 </head>
 
 <body class="auth-body">
+
+    <?php // Bố cục hai cột: cột trang trí bên trái, cột biểu mẫu bên phải. ?>
     <main class="auth-layout">
+
+        <?php // Cột trái: logo và thông điệp (ẩn trên màn hình hẹp). ?>
         <section class="auth-aside">
             <a class="brand brand--light" href="?page=auth/login"><img class="brand-mark" src="assets/images/logo-mark-light.svg" alt="" width="40" height="24"><span class="brand-name">Intern<span>Track</span></span></a>
             <div class="auth-aside-copy">
@@ -49,6 +55,8 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
             </div>
             <div class="auth-aside-footer"><span>INTERNTRACK</span><span>ĐẠI HỌC VINH · NGHỆ AN</span></div>
         </section>
+
+        <?php // Cột phải: biểu mẫu theo bước (đăng nhập / quên mật khẩu / xác minh OTP / mật khẩu mới). ?>
         <section class="auth-main">
             <div class="auth-form-wrap">
                 <a class="brand auth-main-brand" href="?page=auth/login" aria-label="InternTrack, về đăng nhập"><img class="brand-mark" src="assets/images/logo-mark.svg" alt="" width="40" height="24"><span class="brand-name">Intern<span>Track</span></span></a>
@@ -56,18 +64,22 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
                 <p class="eyebrow"><?= $isReset ? ($isPasswordStep ? 'MẬT KHẨU MỚI' : 'XÁC MINH EMAIL') : ($isForgot ? 'KHÔI PHỤC TÀI KHOẢN' : 'CHÀO MỪNG TRỞ LẠI') ?></p>
                 <h1><?= $isReset ? ($isPasswordStep ? 'Tạo mật khẩu mới.' : 'Xác minh mã OTP.') : ($isForgot ? 'Lấy lại quyền truy cập.' : 'Đăng nhập để tiếp tục.') ?></h1>
                 <p class="auth-description"><?= $isReset ? ($isPasswordStep ? 'Tạo mật khẩu mới có ít nhất 10 ký tự.' : 'Nhập mã 6 chữ số đã gửi tới ' . $authEscape($resetEmail) . ' để tiếp tục.') : ($isForgot ? 'Nhập email của bạn. Mã OTP sẽ được gửi tới hộp thư Gmail đã đăng ký.' : 'Chào mừng bạn quay lại InternTrack.') ?></p>
+
+                <?php // Thông báo thành công/lỗi của lần gửi form trước. ?>
                 <?php if ($authFlash !== null): ?>
                     <div class="flash-message flash--<?= $authEscape($authFlash['type']) ?>" role="status">
                         <?= $authEscape($authFlash['message']) ?>
                     </div>
                 <?php endif; ?>
                 <?php if ($isForgot): ?>
+                    <?php // Bước 1 - Quên mật khẩu: nhập email để nhận mã OTP. ?>
                     <form class="auth-form" method="post" action="?page=auth/forgot-password">
                         <input type="hidden" name="_csrf" value="<?= $authEscape(app_csrf_token()) ?>"><input type="hidden" name="action" value="password_reset_request">
                         <label for="email">Gmail đã đăng ký</label><input id="email" name="email" type="email" autocomplete="email" placeholder="ten@gmail.com" required>
                         <button class="button button--primary auth-submit" type="submit">Gửi mã OTP <span aria-hidden="true">↗</span></button>
                     </form>
                 <?php elseif ($isReset): ?>
+                    <?php // Bước 2 - Đặt lại mật khẩu: nhập mã OTP, sau khi máy chủ xác minh mới hiện form tạo mật khẩu mới. ?>
                     <?php if (!$isPasswordStep): ?>
                         <form class="auth-form" method="post" action="?page=auth/reset-password">
                             <input type="hidden" name="_csrf" value="<?= $authEscape(app_csrf_token()) ?>"><input type="hidden" name="action" value="password_reset_verify">
@@ -96,6 +108,7 @@ $authPageDescription = 'Hệ thống InternTrack giúp sinh viên, doanh nghiệ
                         </form>
                     <?php endif; ?>
                 <?php else: ?>
+                    <?php // Mặc định - Đăng nhập bằng email hoặc tên đăng nhập. ?>
                     <form class="auth-form" method="post" action="?page=auth/login">
                         <input type="hidden" name="_csrf" value="<?= $authEscape(app_csrf_token()) ?>"><input type="hidden" name="action" value="login">
                         <label for="email">Email hoặc tên đăng nhập</label><input id="email" name="login" type="text" autocomplete="username" placeholder="email hoặc tên đăng nhập" required>

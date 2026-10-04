@@ -77,14 +77,35 @@ Không có framework, không có bước build và hiện chưa có bộ test t�
 4. Import `database/interntrack.sql` (toàn bộ schema, dùng `CREATE TABLE IF NOT EXISTS` nên chạy lại không xóa dữ liệu).
 5. (Tùy chọn) Import `database/seed.sql` để có dữ liệu mẫu và tài khoản demo — **chỉ dùng ở máy local**.
 6. Tại thư mục dự án chạy `composer install` để cài PHPMailer.
-7. Sao chép `.env.example` thành `.env` và điền cấu hình (xem phần dưới).
+7. Tạo tệp `.env` ở thư mục gốc theo mẫu ở mục [Cấu hình](#cấu-hình-env) bên dưới rồi điền giá trị của bạn.
 8. Mở `http://localhost/InternTrack/`.
 
 Kiểm tra cú pháp một tệp PHP: `C:\xampp\php\php.exe -l <tệp>`.
 
 ## Cấu hình (`.env`)
 
-Mọi cấu hình đọc từ biến môi trường hoặc tệp `.env` ở thư mục gốc (`app_env()` trong `config/app.php`). `.env` bị Git bỏ qua và bị `.htaccess` chặn truy cập qua web. **Chỉ điền bí mật vào `.env`, không điền vào `.env.example`** vì tệp mẫu được commit lên Git.
+Mọi cấu hình đọc từ biến môi trường hoặc tệp `.env` ở thư mục gốc (`app_env()` trong `config/app.php`). `.env` bị Git bỏ qua và bị `.htaccess` chặn truy cập qua web. Dự án chỉ dùng **một tệp `.env` duy nhất** (không có `.env.example`) và tệp này **không bao giờ được commit**, vì nó chứa mật khẩu và khóa API. Khi cài trên máy mới, hãy tạo `.env` với nội dung sau rồi điền giá trị thật:
+
+```ini
+# --- Cơ sở dữ liệu MySQL ---
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=interntrack
+DB_USER=root
+DB_PASSWORD=
+
+# --- Gửi OTP quên mật khẩu bằng Gmail (dùng Google App Password 16 ký tự) ---
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-account@gmail.com
+MAIL_PASSWORD=your-16-character-google-app-password
+MAIL_FROM=your-account@gmail.com
+MAIL_FROM_NAME=InternTrack
+
+# --- Trợ lý AI Gemini (để trống thì mọi tính năng AI tự ẩn) ---
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.8-flash
+```
 
 | Biến                                                                                      | Mặc định                                         | Ý nghĩa                                                                         |
 | ----------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
@@ -186,7 +207,7 @@ InternTrack/
 ├── assets/                        # css/style.css, js/app.js, images/ (logo, favicon SVG)
 ├── database/                      # interntrack.sql (schema đầy đủ), seed.sql (dữ liệu mẫu)
 ├── uploads/                       # Tệp người dùng tải lên (Apache chặn truy cập trực tiếp)
-├── .env.example · composer.json · .htaccess
+├── .env (tự tạo, không commit) · composer.json · .htaccess
 ```
 
 **Luồng xử lý**

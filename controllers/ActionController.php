@@ -108,7 +108,7 @@ function store_uploaded_file(array $file, string $folder, int $maximumBytes): ?s
     $mimeExtensions = match ($folder) {
         'avatars' => ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'],
         // Minh chứng hoàn thành nhiệm vụ: tài liệu, bảng tính, bài trình bày, ảnh chụp, văn bản và tệp nén.
-        'submissions' => $documentTypes + [
+        'submissions', 'messages' => $documentTypes + [
             'application/vnd.ms-excel' => 'xls',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
             'application/vnd.ms-powerpoint' => 'ppt',
@@ -120,6 +120,7 @@ function store_uploaded_file(array $file, string $folder, int $maximumBytes): ?s
             'application/x-7z-compressed' => '7z',
             'image/jpeg' => 'jpg',
             'image/png' => 'png',
+            'image/webp' => 'webp',
             'text/plain' => 'txt',
         ],
         default => $documentTypes,
@@ -128,7 +129,8 @@ function store_uploaded_file(array $file, string $folder, int $maximumBytes): ?s
     if (!isset($mimeExtensions[$mime])) {
         throw new DomainException(match ($folder) {
             'avatars' => 'Ảnh đại diện phải là JPG, PNG hoặc WebP.',
-            'submissions' => 'Minh chứng chấp nhận: Word, PDF, Excel, PowerPoint, ZIP/RAR/7z, ảnh JPG/PNG hoặc văn bản .txt.',
+            'submissions' => 'Minh chứng chấp nhận: Word, PDF, Excel, PowerPoint, ZIP/RAR/7z, ảnh JPG/PNG/WebP hoặc văn bản .txt.',
+            'messages' => 'Tệp đính kèm chấp nhận: Word, PDF, Excel, PowerPoint, ZIP/RAR/7z, ảnh JPG/PNG/WebP hoặc văn bản .txt.',
             default => 'Chỉ chấp nhận tệp PDF, DOC hoặc DOCX.',
         });
     }
@@ -174,6 +176,10 @@ function serve_workspace_download(string $type, int $recordId, array $user): nev
              WHERE t.id = ? AND (t.assigned_to = ? OR i.company_id = ? OR i.lecturer_id = ? OR ? = \'admin\') LIMIT 1'
         );
         $statement->execute([$recordId, $user['student_id'] ?? 0, $user['company_id'] ?? 0, $user['lecturer_id'] ?? 0, $user['role']]);
+    } elseif ($type === 'message') {
+        // Tệp đính kèm tin nhắn: chỉ người gửi và người nhận được tải.
+        $statement = $connection->prepare('SELECT file_path, file_name AS title FROM messages WHERE id = ? AND (sender_id = ? OR recipient_id = ?) LIMIT 1');
+        $statement->execute([$recordId, $user['id'], $user['id']]);
     } elseif ($type === 'avatar') {
         // Ảnh đại diện hiển thị cho mọi người dùng đã đăng nhập để ảnh của một người đồng bộ ở mọi nơi họ xuất hiện.
         $statement = $connection->prepare('SELECT avatar AS file_path, full_name AS title FROM users WHERE id = ? AND status = \'active\' LIMIT 1');
@@ -195,14 +201,17 @@ function serve_workspace_download(string $type, int $recordId, array $user): nev
     $mime = $type === 'avatar'
         ? (['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'][$extension] ?? 'application/octet-stream')
         : (['pdf' => 'application/pdf', 'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'ppt' => 'application/vnd.ms-powerpoint', 'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'zip' => 'application/zip', 'rar' => 'application/vnd.rar', '7z' => 'application/x-7z-compressed', 'jpg' => 'image/jpeg', 'png' => 'image/png', 'txt' => 'text/plain'][$extension] ?? 'application/octet-stream');
-    $downloadName = preg_replace('/[^\pL\pN ._-]/u', '', (string) $file['title']) ?: 'InternTrack';
+    // Tên tệp tin nhắn là tên gốc đã kèm đuôi; bỏ đuôi vì bên dưới sẽ nối lại đuôi thật của tệp đã lưu.
+    $downloadName = preg_replace('/[^\pL\pN ._-]/u', '', $type === 'message' ? pathinfo((string) $file['title'], PATHINFO_FILENAME) : (string) $file['title']) ?: 'InternTrack';
+    // Ảnh trong tin nhắn hiển thị ngay trong khung chat (?inline=1); chỉ nhận ảnh raster, không bao giờ SVG/HTML.
+    $inlineImage = $type === 'message' && ($_GET['inline'] ?? '') === '1' && in_array($extension, ['jpg', 'png', 'webp'], true);
     header('Content-Type: ' . $mime);
     header('Content-Length: ' . filesize($absolutePath));
     header('X-Content-Type-Options: nosniff');
-    if ($type === 'avatar') {
+    if ($type === 'avatar' || $inlineImage) {
         header('Cache-Control: private, max-age=86400');
     }
-    header($type === 'avatar' ? 'Content-Disposition: inline; filename="avatar.' . $extension . '"' : "Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode($downloadName . '.' . $extension));
+    header($inlineImage ? 'Content-Disposition: inline' : ($type === 'avatar' ? 'Content-Disposition: inline; filename="avatar.' . $extension . '"' : "Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode($downloadName . '.' . $extension)));
     readfile($absolutePath);
     exit;
 }
@@ -221,6 +230,28 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $notificationSection = action_value($input, 'section', 40);
             notification_mark_read((int) $user['id'], $notificationId ?: null, $notificationId ? null : ($notificationSection ?: null));
             $successMessage = 'Đã đánh dấu đã đọc.';
+            break;
+
+        // Nhắn tin trực tiếp: chỉ gửi được cho người cùng kỳ thực tập (kiểm tra trong message_send); quay lại đúng hội thoại.
+        case 'message_send':
+            $user = action_user(['student', 'company', 'lecturer']);
+            $recipientId = (int) (filter_var($input['recipient_id'] ?? null, FILTER_VALIDATE_INT) ?: 0);
+            // Kiểm tra quyền nhắn trước khi lưu tệp để người ngoài kỳ thực tập không để lại tệp mồ côi.
+            if (!isset(message_contacts($user)[$recipientId])) {
+                throw new DomainException('Bạn chỉ nhắn tin được với người cùng kỳ thực tập.');
+            }
+            $attachment = $files['attachment'] ?? [];
+            $attachmentPath = store_uploaded_file($attachment, 'messages', 10 * 1024 * 1024);
+            try {
+                message_send($user, $recipientId, action_value($input, 'body', 2000), $attachmentPath, $attachmentPath !== null ? (string) ($attachment['name'] ?? '') : null);
+            } catch (Throwable $error) {
+                if ($attachmentPath !== null) {
+                    @unlink(dirname(__DIR__) . '/' . $attachmentPath);
+                }
+                throw $error;
+            }
+            $route = $user['role'] . '/messages&with=' . $recipientId;
+            $successMessage = 'Đã gửi tin nhắn.';
             break;
 
         case 'ai_match':

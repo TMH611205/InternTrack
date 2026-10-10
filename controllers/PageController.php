@@ -8,6 +8,7 @@ const FINAL_PASS_SCORE = 50.0;
 
 require_once __DIR__ . '/AiMatchController.php';
 require_once __DIR__ . '/AiInsightController.php';
+require_once __DIR__ . '/MessageController.php';
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -1115,6 +1116,13 @@ function load_screen_data(string $screen, array $data, array $user): array
                 ['label' => 'Sắp bắt đầu', 'value' => (string) count(array_filter($internships, static fn($row) => $row['status'] === 'planned')), 'note' => 'Đã được lên kế hoạch'],
                 ['label' => 'Chưa phân công', 'value' => (string) count(array_filter($internships, static fn($row) => $row['id'] !== null && !$row['lecturer_name'])), 'note' => 'Thiếu giảng viên phụ trách'],
             ];
+            break;
+
+        // Nhắn tin trực tiếp (sinh viên / doanh nghiệp / giảng viên): xem MessageController.php.
+        case 'student/messages':
+        case 'company/messages':
+        case 'lecturer/messages':
+            $data = array_merge($data, message_screen_data($user));
             break;
 
         // Màn hình không cần dữ liệu động: giữ nguyên cấu hình mẫu trong page-data.php.

@@ -46,6 +46,51 @@ return [
         'activities' => [['time' => 'Thứ Sáu · 28/08', 'title' => 'Rà soát prototype onboarding', 'description' => 'Kiểm tra luồng tạo tài khoản trên mobile, ghi nhận 3 điểm gây nhầm lẫn và cập nhật prototype Figma. · 7.5 giờ', 'status' => 'Chờ duyệt'], ['time' => 'Thứ Năm · 27/08', 'title' => 'Phỏng vấn người dùng nội bộ', 'description' => 'Thực hiện 2 buổi phỏng vấn với nhóm hỗ trợ khách hàng, tổng hợp insight vào tài liệu nghiên cứu. · 8 giờ', 'status' => 'Đã duyệt'], ['time' => 'Thứ Tư · 26/08', 'title' => 'Workshop cùng nhóm sản phẩm', 'description' => 'Đồng xây dựng journey map và thống nhất phạm vi cho bản thử nghiệm tiếp theo. · 8 giờ']],
     ],
 
+    // [Sinh viên] Nhắn tin trực tiếp với người cùng kỳ thực tập (dữ liệu thật: MessageController.php).
+    'student/messages' => [
+        'role' => 'student',
+        'active' => 'messages',
+        'kind' => 'messages',
+        'eyebrow' => 'Liên lạc',
+        'title' => 'Tin nhắn',
+        'description' => 'Trao đổi trực tiếp với doanh nghiệp và giảng viên hướng dẫn của bạn.',
+        'metrics' => [],
+        'contacts' => [],
+        'selected_id' => 0,
+        'selected' => null,
+        'thread' => [],
+    ],
+
+    // [Doanh nghiệp] Nhắn tin trực tiếp với người cùng kỳ thực tập (dữ liệu thật: MessageController.php).
+    'company/messages' => [
+        'role' => 'company',
+        'active' => 'messages',
+        'kind' => 'messages',
+        'eyebrow' => 'Liên lạc',
+        'title' => 'Tin nhắn',
+        'description' => 'Trao đổi trực tiếp với thực tập sinh và giảng viên phụ trách.',
+        'metrics' => [],
+        'contacts' => [],
+        'selected_id' => 0,
+        'selected' => null,
+        'thread' => [],
+    ],
+
+    // [Giảng viên] Nhắn tin trực tiếp với người cùng kỳ thực tập (dữ liệu thật: MessageController.php).
+    'lecturer/messages' => [
+        'role' => 'lecturer',
+        'active' => 'messages',
+        'kind' => 'messages',
+        'eyebrow' => 'Liên lạc',
+        'title' => 'Tin nhắn',
+        'description' => 'Trao đổi trực tiếp với sinh viên phụ trách và doanh nghiệp tiếp nhận.',
+        'metrics' => [],
+        'contacts' => [],
+        'selected_id' => 0,
+        'selected' => null,
+        'thread' => [],
+    ],
+
     // [Sinh viên] Đánh giá nhận được từ doanh nghiệp và giảng viên.
     'student/evaluation' => [
         'role' => 'student',

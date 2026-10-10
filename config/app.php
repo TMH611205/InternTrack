@@ -50,6 +50,8 @@ function ui_icon(string $name): string
         'calendar' => '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
         'clock' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
         'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+        'chat' => '<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/>',
+        'clip' => '<path d="m21 11-8.6 8.6a5 5 0 0 1-7-7L14 4a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4L15 7"/>',
         'bell' => '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
         'arrow-up-right' => '<path d="M7 17 17 7M8 7h9v9"/>',
         'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
@@ -195,7 +197,9 @@ function app_send_password_reset_otp(string $email, string $otp): bool
 // Dùng 303 để đảm bảo đúng chuẩn redirect sau khi thực hiện POST.
 function app_redirect(string $page): never
 {
-    $location = '?page=' . rawurlencode($page);
+    // Cho phép kèm tham số truy vấn sau dấu & (ví dụ student/messages&with=5); phần tên trang vẫn được mã hóa.
+    [$page, $extraQuery] = array_pad(explode('&', $page, 2), 2, '');
+    $location = '?page=' . rawurlencode($page) . ($extraQuery !== '' ? '&' . $extraQuery : '');
     // Giữ nguyên tab nhóm tài khoản ở trang quản trị sau khi thao tác.
     $group = $_GET['group'] ?? null;
     if ($page === 'admin/users' && is_string($group) && in_array($group, ['student', 'lecturer', 'company', 'admin'], true)) {

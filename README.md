@@ -31,10 +31,12 @@
 - **Bong bóng chat AI** ở mọi trang: gợi ý vị trí, hỏi quy định/mốc thời gian/biểu mẫu của khoa, góp ý CV, soạn thư xin thực tập, gợi ý dàn ý báo cáo cuối kỳ từ nhật ký.
 - Xem **kỹ năng đã được doanh nghiệp xác nhận** trong hồ sơ.
 - Nhận thông báo theo từng mục (chuông và chấm đỏ trên menu).
+- **Nhắn tin trực tiếp** với doanh nghiệp và giảng viên hướng dẫn của mình (mục Tin nhắn).
 
 ### Doanh nghiệp
 
 - Quản lý hồ sơ công ty, đăng và chỉnh sửa vị trí tuyển dụng.
+- **Nhắn tin trực tiếp** với thực tập sinh và giảng viên phụ trách.
 - Xem CV ứng viên, duyệt hồ sơ; khi nhận ứng viên, hệ thống tự tạo kỳ thực tập và tự phân công giảng viên đang phụ trách ít sinh viên nhất.
 - Giao và theo dõi **nhiệm vụ** dạng bảng kanban, có bộ lọc theo sinh viên, tìm kiếm và lọc việc chờ xác nhận; xem minh chứng rồi xác nhận hoặc yêu cầu làm lại.
 - **Đánh giá** thực tập sinh ngay trên từng dòng (lưu nháp, gửi, điều chỉnh sau khi gửi).
@@ -44,6 +46,7 @@
 
 - Theo dõi sinh viên được phân công, kế hoạch thực tập (chỉ xem), tiến độ, nhật ký, báo cáo và đánh giá.
 - Duyệt nhật ký, báo cáo kèm phản hồi.
+- **Nhắn tin trực tiếp** với sinh viên phụ trách và doanh nghiệp tiếp nhận.
 - **AI tóm tắt và chấm sơ bộ** nhật ký, báo cáo; đối chiếu kế hoạch, đánh dấu sơ sài hoặc chép lại tuần trước.
 - **Cảnh báo sớm sinh viên có nguy cơ** (trang Tiến độ) kèm gợi ý can thiệp.
 - **AI soạn nhận xét cuối kỳ** từ đánh giá của doanh nghiệp và giảng viên.

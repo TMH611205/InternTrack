@@ -19,6 +19,7 @@ $navigation = [
         ['key' => 'diary', 'label' => 'Nhật ký', 'page' => 'student/diary', 'icon' => 'book'],
         ['key' => 'reports', 'label' => 'Báo cáo', 'page' => 'student/reports', 'icon' => 'chart'],
         ['key' => 'evaluation', 'label' => 'Đánh giá', 'page' => 'student/evaluation', 'icon' => 'star'],
+        ['key' => 'messages', 'label' => 'Tin nhắn', 'page' => 'student/messages', 'icon' => 'chat'],
         ['key' => 'profile', 'label' => 'Hồ sơ cá nhân', 'page' => 'student/profile', 'icon' => 'user'],
     ],
 
@@ -31,6 +32,7 @@ $navigation = [
         ['key' => 'tasks', 'label' => 'Nhiệm vụ', 'page' => 'company/tasks', 'icon' => 'check'],
         ['key' => 'skills', 'label' => 'Kỹ năng thực tập', 'page' => 'company/skills', 'icon' => 'chart'],
         ['key' => 'evaluations', 'label' => 'Đánh giá', 'page' => 'company/evaluations', 'icon' => 'star'],
+        ['key' => 'messages', 'label' => 'Tin nhắn', 'page' => 'company/messages', 'icon' => 'chat'],
         ['key' => 'profile', 'label' => 'Hồ sơ doanh nghiệp', 'page' => 'company/profile', 'icon' => 'building'],
     ],
 
@@ -42,6 +44,7 @@ $navigation = [
         ['key' => 'diaries', 'label' => 'Nhật ký cần duyệt', 'page' => 'lecturer/diaries', 'icon' => 'book'],
         ['key' => 'reports', 'label' => 'Báo cáo', 'page' => 'lecturer/reports', 'icon' => 'chart'],
         ['key' => 'evaluations', 'label' => 'Đánh giá', 'page' => 'lecturer/evaluations', 'icon' => 'star'],
+        ['key' => 'messages', 'label' => 'Tin nhắn', 'page' => 'lecturer/messages', 'icon' => 'chat'],
         ['key' => 'profile', 'label' => 'Hồ sơ cá nhân', 'page' => 'lecturer/profile', 'icon' => 'user'],
     ],
 

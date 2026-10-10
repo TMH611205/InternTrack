@@ -581,3 +581,93 @@
       event.target.close();
   });
 })();
+
+// Nhắn tin trực tiếp: Enter để gửi, ô nhập tự giãn, luôn cuộn xuống tin mới nhất và tự làm mới hội thoại mỗi vài giây.
+(() => {
+  const root = document.querySelector("[data-chat-root]");
+  if (!root) return;
+  const thread = () => root.querySelector("[data-chat-thread]");
+  const scrollToEnd = () => {
+    const box = thread();
+    if (box) box.scrollTop = box.scrollHeight;
+  };
+  scrollToEnd();
+
+  const input = root.querySelector("[data-chat-input]");
+  const form = root.querySelector("[data-chat-form]");
+  const fileInput = root.querySelector("[data-chat-file]");
+  const picked = root.querySelector("[data-chat-picked]");
+  const maxBytes = 10 * 1024 * 1024;
+  // Hiện tên tệp đã chọn phía trên ô nhập; báo ngay nếu quá 10 MB để người dùng không phải chờ tải lên rồi mới thấy lỗi.
+  const showPicked = () => {
+    const file = fileInput?.files?.[0];
+    if (file && file.size > maxBytes) {
+      alert("Tệp vượt quá 10 MB. Hãy chọn tệp nhỏ hơn.");
+      fileInput.value = "";
+    }
+    const current = fileInput?.files?.[0];
+    picked.hidden = !current;
+    picked.querySelector("[data-chat-picked-name]").textContent = current
+      ? current.name
+      : "";
+  };
+  if (fileInput && picked) {
+    fileInput.addEventListener("change", showPicked);
+    picked
+      .querySelector("[data-chat-picked-clear]")
+      .addEventListener("click", () => {
+        fileInput.value = "";
+        showPicked();
+      });
+  }
+  if (input && form) {
+    const grow = () => {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 140) + "px";
+    };
+    input.addEventListener("input", grow);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        if (input.value.trim() !== "" || fileInput?.files?.length)
+          form.requestSubmit();
+      }
+    });
+    form.addEventListener("submit", () => {
+      form.querySelector("button[type=submit]").disabled = true;
+    });
+    input.focus();
+  }
+
+  // Làm mới định kỳ: tải lại trang hiện tại ở nền rồi thay danh sách liên hệ và nội dung hội thoại nếu có tin mới.
+  const url = root.dataset.chatUrl;
+  if (!url) return;
+  const refresh = async () => {
+    if (document.visibilityState !== "visible") return;
+    try {
+      const response = await fetch(url, { credentials: "same-origin" });
+      if (!response.ok) return;
+      const next = new DOMParser().parseFromString(
+        await response.text(),
+        "text/html",
+      );
+      const swap = (selector) => {
+        const current = root.querySelector(selector);
+        const fresh = next.querySelector(selector);
+        if (!current || !fresh || current.innerHTML === fresh.innerHTML)
+          return false;
+        current.innerHTML = fresh.innerHTML;
+        return true;
+      };
+      swap("[data-chat-contacts]");
+      const box = thread();
+      const nearEnd = box
+        ? box.scrollHeight - box.scrollTop - box.clientHeight < 80
+        : false;
+      if (swap("[data-chat-thread]") && nearEnd) scrollToEnd();
+    } catch (error) {
+      // Mất mạng tạm thời: bỏ qua, lần sau thử lại.
+    }
+  };
+  setInterval(refresh, 6000);
+})();

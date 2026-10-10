@@ -2,7 +2,7 @@
 // Layout tổng quát dùng để render mọi màn hình chính của hệ thống.
 // Dựa trên `kind`, chúng ta sẽ hiển thị theo mẫu dashboard, table, kanban, timeline, cards, profile hoặc detail.
 // content.php: THÂN TRANG của mọi màn hình. Chọn kiểu hiển thị theo $screenData['kind'] (khai báo trong page-data.php):
-//   dashboard · table · kanban · timeline · cards/reports · profile · detail · evaluation · progress.
+//   dashboard · table · kanban · timeline · cards/reports · messages · profile · detail · evaluation · progress.
 // Muốn sửa giao diện một màn hình: tìm nhánh `kind` của nó, rồi nhánh `$screen === '...'` bên trong nếu có.
 global $screenData, $user, $flash, $screen;
 $screenData = is_array($screenData ?? null) ? $screenData : [];
@@ -618,6 +618,70 @@ $primaryAction = $primaryActions[$screen] ?? null;
             <?php if (!$screenData['cards']): ?><p class="opportunity-empty">Hiện chưa có vị trí phù hợp đang mở.</p><?php endif; ?>
             <p class="opportunity-empty" data-opportunity-empty hidden>Không tìm thấy cơ hội khớp với nội dung tìm kiếm.</p>
         <?php endif; ?>
+
+    <?php elseif ($kind === 'messages'): ?>
+        <?php // KIỂU messages: nhắn tin trực tiếp 1-1. Cột trái là danh sách liên hệ, cột phải là hội thoại đang chọn (JS: data-chat-*). ?>
+        <?php
+        $roleText = ['student' => 'Sinh viên', 'company' => 'Doanh nghiệp', 'lecturer' => 'Giảng viên'];
+        $selectedContact = $screenData['selected'];
+        $chatUrl = '?page=' . rawurlencode($screen);
+        ?>
+        <section class="chat-layout" data-chat-root data-chat-url="<?= screen_escape($chatUrl . ($selectedContact ? '&with=' . (int) $selectedContact['user_id'] : '')) ?>">
+            <aside class="chat-contacts" aria-label="Danh sách liên hệ" data-chat-contacts>
+                <?php if (!$screenData['contacts']): ?>
+                    <p class="chat-empty">Chưa có ai để nhắn tin. Bạn nhắn tin được với doanh nghiệp, giảng viên và sinh viên cùng kỳ thực tập sau khi hồ sơ ứng tuyển được chấp nhận.</p>
+                <?php endif; ?>
+                <?php foreach ($screenData['contacts'] as $contact): ?>
+                    <a class="chat-contact<?= $selectedContact && (int) $selectedContact['user_id'] === (int) $contact['user_id'] ? ' is-active' : '' ?>" href="<?= screen_escape($chatUrl . '&with=' . (int) $contact['user_id']) ?>">
+                        <span class="user-avatar"><?= screen_escape(screen_initial($contact['name'])) ?></span>
+                        <span class="chat-contact-body">
+                            <strong><?= screen_escape($contact['name']) ?></strong>
+                            <small><?= screen_escape($roleText[$contact['role']] ?? '') ?><?= $contact['context'] !== '' ? ' · ' . screen_escape($contact['context']) : '' ?></small>
+                            <?php if ($contact['last_body'] !== ''): ?><em><?= $contact['last_mine'] ? 'Bạn: ' : '' ?><?= screen_escape(mb_strimwidth($contact['last_body'], 0, 60, '…', 'UTF-8')) ?></em><?php endif; ?>
+                        </span>
+                        <?php if ($contact['unread'] > 0): ?><span class="nav-count" title="<?= (int) $contact['unread'] ?> tin chưa đọc"><?= (int) $contact['unread'] > 99 ? '99+' : (int) $contact['unread'] ?></span><?php endif; ?>
+                    </a>
+                <?php endforeach; ?>
+            </aside>
+
+            <div class="chat-panel">
+                <?php if (!$selectedContact): ?>
+                    <p class="chat-empty chat-empty--center"><?= $screenData['contacts'] ? 'Chọn một người ở danh sách bên trái để bắt đầu trò chuyện.' : 'Chưa có cuộc trò chuyện nào.' ?></p>
+                <?php else: ?>
+                    <header class="chat-head">
+                        <span class="user-avatar"><?= screen_escape(screen_initial($selectedContact['name'])) ?></span>
+                        <div><strong><?= screen_escape($selectedContact['name']) ?></strong><small><?= screen_escape($roleText[$selectedContact['role']] ?? '') ?><?= $selectedContact['context'] !== '' ? ' · ' . screen_escape($selectedContact['context']) : '' ?></small></div>
+                    </header>
+                    <div class="chat-thread" data-chat-thread aria-live="polite">
+                        <?php if (!$screenData['thread']): ?><p class="chat-empty chat-empty--center">Chưa có tin nhắn. Hãy gửi lời chào đầu tiên.</p><?php endif; ?>
+                        <?php $lastDay = ''; foreach ($screenData['thread'] as $message): ?>
+                            <?php $day = date('d/m/Y', (int) strtotime((string) $message['created_at'])); if ($day !== $lastDay): $lastDay = $day; ?><p class="chat-day"><?= $day === date('d/m/Y') ? 'Hôm nay' : screen_escape($day) ?></p><?php endif; ?>
+                            <div class="chat-message<?= (int) $message['sender_id'] === (int) $user['id'] ? ' chat-message--mine' : '' ?>">
+                                <?php if ($message['file_path'] !== null): ?>
+                                    <?php $fileUrl = '?download=message&id=' . (int) $message['id']; $isImage = in_array(strtolower(pathinfo((string) $message['file_path'], PATHINFO_EXTENSION)), ['jpg', 'png', 'webp'], true); ?>
+                                    <?php if ($isImage): ?>
+                                        <a class="chat-image" href="<?= screen_escape($fileUrl) ?>" title="Tải ảnh về"><img src="<?= screen_escape($fileUrl . '&inline=1') ?>" alt="<?= screen_escape($message['file_name']) ?>" loading="lazy"></a>
+                                    <?php else: ?>
+                                        <a class="chat-file" href="<?= screen_escape($fileUrl) ?>"><span class="chat-file-icon" aria-hidden="true"><?= ui_icon('file') ?></span><span class="chat-file-name"><?= screen_escape($message['file_name']) ?></span><span aria-hidden="true">↓</span></a>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if ($message['body'] !== ''): ?><p><?= nl2br(screen_escape($message['body']), false) ?></p><?php endif; ?>
+                                <time datetime="<?= screen_escape($message['created_at']) ?>"><?= screen_escape(date('H:i', (int) strtotime((string) $message['created_at']))) ?></time>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <form method="post" action="<?= screen_escape($chatUrl) ?>" class="chat-form" data-chat-form enctype="multipart/form-data">
+                        <input type="hidden" name="_csrf" value="<?= screen_escape(app_csrf_token()) ?>"><input type="hidden" name="action" value="message_send"><input type="hidden" name="recipient_id" value="<?= (int) $selectedContact['user_id'] ?>">
+                        <label class="chat-attach" title="Đính kèm tệp hoặc ảnh (tối đa 10 MB)"><input type="file" name="attachment" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.jpg,.jpeg,.png,.webp" data-chat-file><?= ui_icon('clip') ?><span class="visually-hidden">Đính kèm tệp</span></label>
+                        <div class="chat-compose">
+                            <p class="chat-picked" data-chat-picked hidden><span data-chat-picked-name></span><button type="button" data-chat-picked-clear aria-label="Bỏ tệp đã chọn">&times;</button></p>
+                            <textarea name="body" rows="1" maxlength="2000" placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)" aria-label="Nội dung tin nhắn" data-chat-input></textarea>
+                        </div>
+                        <button class="button button--primary" type="submit">Gửi</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </section>
 
     <?php elseif ($kind === 'profile'): ?>
         <?php // KIỂU profile: hồ sơ cá nhân dạng danh sách trường (sinh viên, doanh nghiệp, giảng viên, quản trị). ?>

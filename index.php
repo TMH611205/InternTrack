@@ -23,7 +23,18 @@ $availablePages = [
     'auth/login',
     'auth/forgot-password',
     'auth/reset-password',
+    'auth/register',
     'admin/dashboard',
+    'admin/announcements',
+    'admin/audit',
+    'admin/batches',
+    'admin/templates',
+    'admin/matching',
+    'admin/placements',
+    'admin/rubrics',
+    'admin/statistics',
+    'admin/theses',
+    'admin/topics',
     'admin/profile',
     'admin/companies',
     'admin/documents',
@@ -31,7 +42,10 @@ $availablePages = [
     'admin/positions',
     'admin/students',
     'admin/users',
+    'company/announcements',
     'company/applications',
+    'company/attendance',
+    'company/diaries',
     'company/dashboard',
     'company/evaluations',
     'company/inters',
@@ -40,7 +54,11 @@ $availablePages = [
     'company/profile',
     'company/skills',
     'company/tasks',
+    'lecturer/announcements',
     'lecturer/dashboard',
+    'lecturer/defense',
+    'lecturer/theses',
+    'lecturer/topics',
     'lecturer/profile',
     'lecturer/diaries',
     'lecturer/messages',
@@ -48,7 +66,10 @@ $availablePages = [
     'lecturer/progress',
     'lecturer/reports',
     'lecturer/students',
+    'student/announcements',
     'student/applications',
+    'student/placement',
+    'student/thesis',
     'student/dashboard',
     'student/diary',
     'student/evaluation',
@@ -63,6 +84,37 @@ $route = isset($_GET['page']) && is_string($_GET['page']) ? $_GET['page'] : 'aut
 if (!in_array($route, $availablePages, true)) {
     http_response_code(404);
     $route = 'auth/login';
+}
+// Sau khi gửi form, quay lại đúng đợt / tab đang xem (tham số batch, run, date trên URL).
+$returnRoute = $route;
+foreach (['batch', 'run'] as $keepKey) {
+    if (filter_var($_GET[$keepKey] ?? null, FILTER_VALIDATE_INT)) {
+        $returnRoute .= '&' . $keepKey . '=' . (int) $_GET[$keepKey];
+    }
+}
+
+// API đồng bộ với hệ thống đào tạo (máy chủ gọi máy chủ, xác thực bằng SYNC_API_KEY; không cần phiên đăng nhập / CSRF).
+if (($_GET['api'] ?? '') === 'sync') {
+    require_once __DIR__ . '/controllers/SyncApiController.php';
+    sync_api_handle();
+}
+
+// Đăng nhập bằng email trường (Google SSO): ?sso=google bắt đầu, ?sso=callback nhận kết quả.
+if (in_array($_GET['sso'] ?? '', ['google', 'callback'], true)) {
+    require_once __DIR__ . '/controllers/SsoController.php';
+    try {
+        if ($_GET['sso'] === 'google') {
+            sso_start();
+        }
+        $ssoUser = sso_callback($_GET);
+        require_once __DIR__ . '/controllers/ActionController.php';
+        audit_record('login_sso', [], $ssoUser);
+        app_set_flash('success', 'Đăng nhập thành công.');
+        app_redirect($ssoUser['role'] . '/dashboard');
+    } catch (DomainException $error) {
+        app_set_flash('error', $error->getMessage());
+        app_redirect('auth/login');
+    }
 }
 
 // Xử lý toàn bộ request POST: login, logout, gửi OTP, xác minh OTP, reset password và các thao tác nghiệp vụ.
@@ -104,6 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
             if (authenticate_user($identifier, $password)) {
                 $user = authenticated_user();
+                require_once __DIR__ . '/controllers/ActionController.php';
+                audit_record('login', [], $user);
                 app_set_flash('success', 'Đăng nhập thành công.');
                 app_redirect($user['role'] . '/dashboard');
             }
@@ -112,6 +166,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'logout') {
+            if ($loggedOut = authenticated_user()) {
+                require_once __DIR__ . '/controllers/ActionController.php';
+                audit_record('logout', [], $loggedOut);
+            }
             end_user_session();
             app_start_session();
             app_set_flash('success', 'Bạn đã đăng xuất.');
@@ -202,16 +260,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             app_redirect('auth/login');
         }
 
+        // Doanh nghiệp tự đăng ký (trang công khai): tài khoản chờ khoa xác minh.
+        if ($action === 'company_register') {
+            require_once __DIR__ . '/controllers/ActionController.php';
+            admin_tools_register_company($_POST);
+            app_set_flash('success', 'Đã gửi đăng ký. Khoa sẽ xác minh thông tin doanh nghiệp; bạn đăng nhập được sau khi được duyệt.');
+            app_redirect('auth/login');
+        }
+
         require_once __DIR__ . '/controllers/ActionController.php';
-        $redirectPage = handle_workspace_action($action, $route, $_POST, $_FILES);
-        app_redirect($redirectPage ?: $route);
+        $redirectPage = handle_workspace_action($action, $returnRoute, $_POST, $_FILES);
+        app_redirect($redirectPage ?: $returnRoute);
     } catch (DomainException $error) {
         app_set_flash('error', $error->getMessage());
-        app_redirect($route);
+        app_redirect($returnRoute);
     } catch (Throwable $error) {
         error_log('InternTrack request failed: ' . $error->getMessage());
         app_set_flash('error', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra dữ liệu và thử lại.');
-        app_redirect($route);
+        app_redirect($returnRoute);
     }
 }
 
@@ -230,12 +296,27 @@ if ($downloadType !== '') {
     }
     serve_workspace_download($downloadType, $downloadId, $user);
 }
-$publicPages = ['auth/login', 'auth/forgot-password', 'auth/reset-password'];
+// Xuất dữ liệu: ?export=<loại> (CSV mở bằng Excel, biểu mẫu in/PDF, sao lưu). Quyền kiểm tra trong serve_export().
+$exportType = is_string($_GET['export'] ?? null) ? $_GET['export'] : '';
+if ($exportType !== '') {
+    if ($user === null) {
+        http_response_code(401);
+        exit('Vui lòng đăng nhập để xuất dữ liệu.');
+    }
+    require_once __DIR__ . '/controllers/ActionController.php';
+    try {
+        serve_export($exportType, $user);
+    } catch (DomainException $error) {
+        http_response_code(403);
+        exit(htmlspecialchars($error->getMessage(), ENT_QUOTES, 'UTF-8'));
+    }
+}
+$publicPages = ['auth/login', 'auth/forgot-password', 'auth/reset-password', 'auth/register'];
 if ($user === null && !in_array($route, $publicPages, true)) {
     app_set_flash('error', 'Vui lòng đăng nhập để tiếp tục.');
     app_redirect('auth/login');
 }
-if ($user !== null && in_array($route, ['auth/login', 'auth/forgot-password'], true)) {
+if ($user !== null && in_array($route, ['auth/login', 'auth/forgot-password', 'auth/register'], true)) {
     app_redirect($user['role'] . '/dashboard');
 }
 if ($user === null && $route === 'auth/reset-password') {
@@ -247,7 +328,7 @@ if ($user === null && $route === 'auth/reset-password') {
 }
 if ($user !== null && !in_array($route, $publicPages, true)) {
     $requiredRole = explode('/', $route, 2)[0];
-    if ($requiredRole !== $user['role']) {
+    if ($requiredRole !== $user['role'] || in_array($route, app_hidden_pages($user), true)) {
         http_response_code(403);
         app_set_flash('error', 'Bạn không có quyền truy cập trang này.');
         app_redirect($user['role'] . '/dashboard');

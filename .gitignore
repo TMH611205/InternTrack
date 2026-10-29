@@ -6,3 +6,4 @@
 !/uploads/.htaccess
 !/uploads/**/.htaccess
 !/uploads/**/.gitkeep
+/backups/

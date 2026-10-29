@@ -6,7 +6,7 @@
 <?php if (($user['role'] ?? '') === 'student' && function_exists('ai_match_enabled') && ai_match_enabled()): ?>
     <div class="ai-chat" data-ai-chat data-csrf="<?= screen_escape(app_csrf_token()) ?>" data-endpoint="index.php">
         <section class="ai-chat-panel" data-ai-chat-panel hidden aria-label="Trợ lý AI">
-            <header class="ai-chat-head"><span class="ai-chat-head-avatar"><img src="assets/images/logo-mark-light.svg" alt="" width="24" height="15"></span><div class="ai-chat-head-text"><strong>Trợ lý InternTrack</strong><span>Gợi ý thực tập từ CV của bạn</span></div><button type="button" class="ai-chat-close" data-ai-chat-close aria-label="Đóng">&times;</button></header>
+            <header class="ai-chat-head"><span class="ai-chat-head-avatar"><img src="assets/images/vinhuni-logo.png" alt="" width="24" height="24"></span><div class="ai-chat-head-text"><strong>Trợ lý ĐH Vinh</strong><span>Gợi ý thực tập từ CV của bạn</span></div><button type="button" class="ai-chat-close" data-ai-chat-close aria-label="Đóng">&times;</button></header>
             <div class="ai-chat-log" data-ai-chat-log aria-live="polite"></div>
             <div class="ai-chat-suggest" data-ai-chat-suggest>
                 <button type="button">Vị trí nào hợp với CV của tôi nhất?</button>

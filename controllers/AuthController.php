@@ -21,6 +21,7 @@ function authenticate_user(string $identifier, string $password): bool
     session_regenerate_id(true);
     $_SESSION['user_id'] = (int) $account['id'];
     $_SESSION['role'] = $account['role'];
+    unset($_SESSION['active_role']);
     database()->prepare('UPDATE users SET last_login_at = NOW() WHERE id = ?')->execute([$account['id']]);
     return true;
 }
@@ -145,14 +146,16 @@ function authenticated_user(): ?array
         return null;
     }
 
+    // Tài khoản doanh nghiệp: chủ hồ sơ (companies.user_id) hoặc người hướng dẫn thuộc doanh nghiệp (company_mentors).
     $statement = database()->prepare(
-        'SELECT u.id, u.username, u.email, u.full_name, u.phone, u.avatar, u.role, u.status,
+        'SELECT u.id, u.username, u.email, u.full_name, u.phone, u.avatar, u.role AS primary_role, u.status, u.scope_faculty,
 				s.id AS student_id, s.student_code, s.major, s.class_name, s.faculty, s.university, s.cv_file, s.bio,
-				c.id AS company_id, c.company_code, c.company_name, c.status AS company_status,
-				l.id AS lecturer_id, l.lecturer_code, l.department
+				c.id AS company_id, c.company_code, c.company_name, c.status AS company_status, cm.user_id IS NOT NULL AS is_mentor,
+				l.id AS lecturer_id, l.lecturer_code, l.department, l.faculty AS lecturer_faculty, l.is_head
 		 FROM users u
 		 LEFT JOIN students s ON s.user_id = u.id
-		 LEFT JOIN companies c ON c.user_id = u.id
+		 LEFT JOIN company_mentors cm ON cm.user_id = u.id
+		 LEFT JOIN companies c ON c.id = COALESCE(cm.company_id, (SELECT id FROM companies WHERE user_id = u.id LIMIT 1))
 		 LEFT JOIN lecturers l ON l.user_id = u.id
 		 WHERE u.id = :id LIMIT 1'
     );
@@ -160,11 +163,36 @@ function authenticated_user(): ?array
     $user = $statement->fetch();
 
     if (!$user || $user['status'] !== 'active') {
-        unset($_SESSION['user_id'], $_SESSION['role']);
+        unset($_SESSION['user_id'], $_SESSION['role'], $_SESSION['active_role']);
         return null;
     }
 
+    // Một tài khoản có thể có thêm vai trò (user_roles); vai trò đang dùng lưu trong phiên và đổi được ở thanh bên.
+    $roles = [$user['primary_role']];
+    foreach (auth_extra_roles((int) $user['id']) as $extra) {
+        if (!in_array($extra, $roles, true) && ($extra !== 'lecturer' || $user['lecturer_id'])) {
+            $roles[] = $extra;
+        }
+    }
+    $active = $_SESSION['active_role'] ?? $user['primary_role'];
+    $user['roles'] = $roles;
+    $user['role'] = in_array($active, $roles, true) ? $active : $user['primary_role'];
+    $user['is_mentor'] = (bool) $user['is_mentor'];
+    // Người hướng dẫn tại doanh nghiệp: các truy vấn thực tập của doanh nghiệp lọc thêm theo @it_mentor (chỉ thực tập sinh được giao).
+    database()->exec('SET @it_mentor = ' . ($user['is_mentor'] && $user['role'] === 'company' ? (int) $user['id'] : 'NULL'));
+    // Phạm vi khoa chỉ áp dụng khi đang dùng vai trò quản trị.
+    $user['scope_faculty'] = $user['role'] === 'admin' ? ($user['scope_faculty'] ?: null) : null;
+    // Quản trị cấp khoa: các truy vấn danh sách của quản trị lọc theo @it_faculty (khoa của sinh viên, giảng viên, ngành của đợt).
+    database()->prepare('SET @it_faculty = ?')->execute([$user['scope_faculty']]);
+
     return $user;
+}
+
+function auth_extra_roles(int $userId): array
+{
+    $statement = database()->prepare('SELECT role FROM user_roles WHERE user_id = ?');
+    $statement->execute([$userId]);
+    return array_column($statement->fetchAll(), 'role');
 }
 
 // Hủy toàn bộ session người dùng khi đăng xuất hoặc hết phiên.

@@ -1,6 +1,6 @@
-# InternTrack
+# InternTrack · Hệ thống quản lý thực tập & đồ án – Trường Đại học Vinh
 
-**InternTrack** là hệ thống quản lý và theo dõi kỳ thực tập dành cho trường đại học, kết nối **sinh viên**, **doanh nghiệp**, **giảng viên hướng dẫn** và **quản trị viên (khoa)** trên một nền tảng duy nhất. Giao diện hoàn toàn bằng tiếng Việt, kèm các trợ lý AI (Google Gemini) giúp ghép sinh viên với vị trí, đọc nhật ký/báo cáo, cảnh báo sớm sinh viên có nguy cơ và xác nhận kỹ năng thực tế.
+**InternTrack** là hệ thống quản lý kỳ thực tập và **đồ án tốt nghiệp** của Trường Đại học Vinh, kết nối **sinh viên**, **doanh nghiệp**, **giảng viên hướng dẫn** và **quản trị viên (khoa)** trên một nền tảng duy nhất. Giao diện hoàn toàn bằng tiếng Việt, kèm các trợ lý AI (Google Gemini) giúp ghép sinh viên với vị trí, đọc nhật ký/báo cáo, cảnh báo sớm sinh viên có nguy cơ và xác nhận kỹ năng thực tế.
 
 Ứng dụng viết bằng PHP thuần (không framework, không bước build), dùng PDO/MySQL và chạy trên Apache/XAMPP.
 
@@ -59,6 +59,33 @@
 - Quản lý **tài liệu của khoa** (quy định, mốc thời gian, biểu mẫu) làm nguồn cho trợ lý hỏi đáp.
 - Bảng điều khiển có thống kê và **thống kê kỹ năng doanh nghiệp đang cần** do AI tổng hợp, kèm gợi ý điều chỉnh chương trình.
 
+### Đồ án tốt nghiệp (phân hệ mới)
+
+- **Đợt & mốc thời gian** (quản trị): năm học/học kỳ, danh mục ngành, đợt thực tập/đồ án theo học kỳ, ngành, hệ đào tạo; mốc đăng ký đề tài, chọn nguyện vọng, ghép cặp, nộp báo cáo từng giai đoạn, chấm, bảo vệ, đóng đợt. Chức năng **tự mở/khóa theo mốc**; đóng đợt là **chốt và khóa dữ liệu**. Danh sách sinh viên **đủ điều kiện** lập theo số tín chỉ, GPA, ngành, hệ đào tạo (điều chỉnh tay được).
+- **Đề tài**: giảng viên đăng ký (mô tả, mục tiêu, yêu cầu, công nghệ, lĩnh vực, số SV tối đa, tệp đính kèm) trong hạn mức hướng dẫn; khoa hoặc **trưởng bộ môn** duyệt / yêu cầu sửa / từ chối; **cảnh báo trùng lặp** tên đề tài; **kho đề tài** các khóa (tìm theo năm, hướng, giảng viên). Sinh viên được **đề xuất đề tài riêng**, giảng viên xét duyệt (duyệt là ghép luôn).
+- **Nguyện vọng & nhóm**: sinh viên xếp hạng nguyện vọng (sửa được đến hạn), đăng ký **nhóm** có nhóm trưởng và xác nhận thành viên; giảng viên **xếp hạng sinh viên** cho đề tài của mình (ghép hai phía).
+- **Ghép cặp tự động**: Gale-Shapley (sinh viên đề xuất / đề tài đề xuất), Serial Dictatorship (theo GPA hoặc thời điểm), Hungarian (tối ưu tổng mức hài lòng); cấu hình trọng số GPA / thời điểm đăng ký / khớp kỹ năng và cách phá đồng hạng. **Chạy thử, so sánh 4 thuật toán** (tỷ lệ NV1/2/3, chưa ghép, **cặp bất ổn – blocking pairs**, độ lấp đầy), lưu **lịch sử** mỗi lần chạy, **ghép thủ công**, **khóa cặp** rồi chạy lại phần còn lại, **công bố**, sinh viên **xác nhận/từ chối**, **vòng bổ sung**.
+- **Phân công & bảo vệ**: tự phân công **phản biện** (khác người hướng dẫn, cân bằng tải, đúng chuyên môn), lập **hội đồng** (chủ tịch, thư ký, ủy viên), tự xếp hội đồng tránh xung đột lợi ích, **xếp lịch bảo vệ**, cảnh báo vượt hạn mức / xung đột, **phúc khảo**, **công bố điểm**.
+- **Theo dõi quá trình**: kế hoạch & mốc công việc, **lịch gặp / nhật ký hướng dẫn** (giảng viên xác nhận, ghi biên bản), **nộp báo cáo theo phiên bản** (kiểm tra định dạng/dung lượng, ghi nhận **nộp trễ**), **góp ý trên từng phiên bản**, **nhắc hạn tự động** (thông báo + email).
+- **Chấm theo rubric**: thư viện rubric (tiêu chí, trọng số, điểm tối đa, mô tả mức) dùng lại giữa các đợt; phiếu chấm hướng dẫn / phản biện / hội đồng; điểm tổng kết tính theo trọng số của đợt.
+
+### Thực tập (bổ sung)
+
+- **Doanh nghiệp tự đăng ký** tài khoản (trang `?page=auth/register`) và chờ khoa xác minh; hồ sơ có lĩnh vực, người liên hệ, trạng thái **biên bản ghi nhớ (MoU)**.
+- Sinh viên **tự tìm nơi thực tập**: khai báo đơn vị, khoa duyệt và hệ thống tự tạo kỳ thực tập.
+- **Giấy tờ**: in **giấy giới thiệu** (PDF), tải lên phiếu tiếp nhận, cam kết, xác nhận của đơn vị.
+- **Điểm danh / chuyên cần** do doanh nghiệp ghi; vắng 3 buổi hoặc 7 ngày không nhật ký sẽ **cảnh báo** giảng viên.
+- Sinh viên **đánh giá lại đơn vị thực tập** (mức hài lòng, người hướng dẫn, được giữ lại / có việc làm).
+
+### Dùng chung
+
+- **Thông báo chung** theo đợt / lớp / vai trò (kèm email nếu bật `MAIL_NOTIFY=1`) và **lịch chung**: hạn nộp, lịch gặp, lịch bảo vệ, hạn nhiệm vụ.
+- **Thống kê & báo cáo**: tiến độ nộp, số bị trễ, phân bố điểm, mức thỏa mãn nguyện vọng, đề tài nhiều/ít người chọn, tải giảng viên, thống kê doanh nghiệp, so sánh giữa các đợt/năm.
+- **Xuất Excel (CSV) / PDF (trang in)**: bảng điểm đồ án, bảng điểm thực tập, quyết định phân công, danh sách hội đồng & lịch bảo vệ, biên bản bảo vệ, phiếu chấm, giấy giới thiệu, danh sách tài khoản.
+- **Nhập hàng loạt từ Excel** (CSV UTF-8, hoặc XLSX khi PHP bật `zip`): tạo mới hoặc cập nhật tài khoản, đồng bộ GPA / tín chỉ từ hệ thống đào tạo.
+- **Nhật ký hệ thống (audit log)**: ai sửa / ghép / chấm gì, lúc nào; **sao lưu và phục hồi** dữ liệu (.sql).
+- Thương hiệu **Trường Đại học Vinh** (logo, tông xanh của e-learning), giao diện dùng được trên máy tính và điện thoại.
+
 ## Công nghệ
 
 | Thành phần            | Chi tiết                                                                  |
@@ -78,10 +105,14 @@ Không có framework, không có bước build và hiện chưa có bộ test t�
 2. Khởi động **Apache** và **MySQL** trong XAMPP Control Panel.
 3. Vào `http://localhost/phpmyadmin`, tạo database `interntrack` với collation `utf8mb4_unicode_ci`.
 4. Import `database/interntrack.sql` (toàn bộ schema, dùng `CREATE TABLE IF NOT EXISTS` nên chạy lại không xóa dữ liệu).
-5. (Tùy chọn) Import `database/seed.sql` để có dữ liệu mẫu và tài khoản demo — **chỉ dùng ở máy local**.
-6. Tại thư mục dự án chạy `composer install` để cài PHPMailer.
-7. Tạo tệp `.env` ở thư mục gốc theo mẫu ở mục [Cấu hình](#cấu-hình-env) bên dưới rồi điền giá trị của bạn.
-8. Mở `http://localhost/InternTrack/`.
+5. (Tùy chọn) Import `database/seed.sql` rồi `database/seed-thesis.sql` để có dữ liệu mẫu (đợt đồ án, đề tài, nguyện vọng, rubric) và tài khoản demo — **chỉ dùng ở máy local**.
+   - **Nâng cấp database cũ** (đã có dữ liệu từ phiên bản trước): sao lưu trước, rồi chạy `C:\xampp\php\php.exe scripts\migrate.php`. Script tự thêm bảng, cột và giá trị ENUM còn thiếu theo `database/interntrack.sql`, chạy lại nhiều lần vẫn an toàn (thêm `--database=<tên>` để chạy thử trên bản sao).
+6. Tại thư mục dự án chạy `composer install` để cài PHPMailer và dompdf (tạo tệp PDF).
+7. (Nên có) Đặt lịch chạy `scripts/cron.php` mỗi giờ: nhắc hạn, cảnh báo và sao lưu tự động hằng ngày vào `backups/` (giữ 14 bản).
+   - Windows: Task Scheduler → chương trình `C:\xampp\php\php.exe`, đối số `C:\xampp\htdocs\InternTrack\scripts\cron.php`.
+   - Linux: `0 * * * * php /var/www/InternTrack/scripts/cron.php`.
+8. Tạo tệp `.env` ở thư mục gốc theo mẫu ở mục [Cấu hình](#cấu-hình-env) bên dưới rồi điền giá trị của bạn.
+9. Mở `http://localhost/InternTrack/`.
 
 Kiểm tra cú pháp một tệp PHP: `C:\xampp\php\php.exe -l <tệp>`.
 
@@ -108,6 +139,18 @@ MAIL_FROM_NAME=InternTrack
 # --- Trợ lý AI Gemini (để trống thì mọi tính năng AI tự ẩn) ---
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.8-flash
+
+# --- Gửi kèm email cho thông báo quan trọng (kết quả ghép, điểm, nhắc hạn); 1 = bật ---
+MAIL_NOTIFY=0
+
+# --- Đăng nhập bằng email trường (Google Workspace); để trống thì ẩn nút SSO ---
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+SSO_EMAIL_DOMAIN=vinhuni.edu.vn
+APP_URL=http://localhost/InternTrack
+
+# --- API đồng bộ với hệ thống đào tạo (khóa bí mật ≥ 24 ký tự); để trống thì tắt API ---
+SYNC_API_KEY=
 ```
 
 | Biến                                                                                      | Mặc định                                         | Ý nghĩa                                                                         |
@@ -116,6 +159,11 @@ GEMINI_MODEL=gemini-3.8-flash
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`, `MAIL_FROM_NAME` | Gmail SMTP, cổng 587                             | Gửi OTP quên mật khẩu                                                           |
 | `GEMINI_API_KEY`                                                                          | rỗng                                             | Khóa Gemini; **để trống thì mọi tính năng AI tự ẩn**                            |
 | `GEMINI_MODEL`                                                                            | `gemini-3.8-flash`                               | Model Gemini sử dụng (model `gemini-2.5-flash` không còn cấp cho tài khoản mới) |
+| `MAIL_NOTIFY`                                                                             | `0`                                              | `1` = gửi kèm email (qua SMTP ở trên) cho thông báo quan trọng                  |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                | rỗng                                             | OAuth client (Google Cloud Console) để đăng nhập bằng email trường; URI chuyển hướng: `APP_URL/index.php?sso=callback` |
+| `SSO_EMAIL_DOMAIN`                                                                        | `vinhuni.edu.vn`                                 | Chỉ nhận email thuộc tên miền này; tài khoản phải có sẵn trong hệ thống (khớp email) |
+| `APP_URL`                                                                                 | tự suy ra                                        | Địa chỉ gốc của ứng dụng (dùng cho SSO)                                         |
+| `SYNC_API_KEY`                                                                            | rỗng                                             | Khóa API đồng bộ: `POST index.php?api=sync` (JSON `users`) và `GET index.php?api=sync&type=results`, header `X-Api-Key` |
 
 ## Tài khoản đăng nhập
 
@@ -126,6 +174,7 @@ Sau khi import `database/seed.sql`, có thể dùng các tài khoản demo (ch�
 | Sinh viên    | `student`  | `Student@123`  |
 | Doanh nghiệp | `company`  | `Company@123`  |
 | Giảng viên   | `lecturer` | `Lecturer@123` |
+| Phòng đào tạo (quản trị, từ `seed-thesis.sql`) | `phongdaotao` | `Daotao@123` |
 
 Tài khoản **quản trị viên không có mật khẩu mặc định**. Tạo một password hash rồi chèn vào bảng `users`:
 
@@ -208,7 +257,8 @@ InternTrack/
 │   ├── <vai_trò>/<màn_hình>.php   # Mỗi tệp chỉ khai báo $screen rồi gọi layout chung
 │   └── layouts/                   # screen, header, sidebar, content, forms, footer, page-data, ai-insight
 ├── assets/                        # css/style.css, js/app.js, images/ (logo, favicon SVG)
-├── database/                      # interntrack.sql (schema đầy đủ), seed.sql (dữ liệu mẫu)
+├── database/                      # interntrack.sql (schema đầy đủ), seed.sql + seed-thesis.sql (dữ liệu mẫu)
+├── scripts/                       # migrate.php (nâng cấp DB cũ), cron.php (nhắc hạn + sao lưu tự động) — chỉ chạy bằng dòng lệnh
 ├── uploads/                       # Tệp người dùng tải lên (Apache chặn truy cập trực tiếp)
 ├── .env (tự tạo, không commit) · composer.json · .htaccess
 ```
@@ -249,7 +299,7 @@ Schema đã gộp mọi migration cũ. Với database cài từ phiên bản tr�
 ## Triển khai production
 
 - Dùng **HTTPS**, mật khẩu database riêng, tài khoản DB quyền tối thiểu, cập nhật PHP/MySQL và tắt hiển thị lỗi ra trình duyệt.
-- **Không import `seed.sql`**; tạo tài khoản với mật khẩu riêng, không tái sử dụng mật khẩu local.
+- **Không import `seed.sql` / `seed-thesis.sql`**; tạo tài khoản với mật khẩu riêng, không tái sử dụng mật khẩu local.
 - Cấu hình `DB_*`, `MAIL_*`, `GEMINI_API_KEY` trong môi trường máy chủ, không lưu bí mật trong repository.
 - Cân nhắc thông báo/đồng ý xử lý dữ liệu khi dùng AI và gói trả phí của Gemini nếu cần cam kết riêng tư.
 - Sao lưu database và thư mục `uploads/`; kiểm tra quyền ghi của PHP trên `uploads/` và khả năng gửi email.

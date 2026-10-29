@@ -55,6 +55,14 @@ function ui_icon(string $name): string
         'bell' => '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
         'arrow-up-right' => '<path d="M7 17 17 7M8 7h9v9"/>',
         'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
+        'layers' => '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5M2 17l10 5 10-5"/>',
+        'shuffle' => '<path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>',
+        'award' => '<circle cx="12" cy="9" r="6"/><path d="m8.2 13.8-1.7 7.7L12 19l5.5 2.5-1.7-7.7"/>',
+        'clipboard' => '<rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/>',
+        'megaphone' => '<path d="M3 11v3l13 5V6L3 11z"/><path d="M16 9a3 3 0 0 1 0 6M7 15.5V19a2 2 0 0 0 4 0v-2"/>',
+        'moon' => '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+        'sun' => '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+        'shield' => '<path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/>',
     ];
 
     return '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' . ($paths[$name] ?? $paths['file']) . '</svg>';
@@ -155,12 +163,18 @@ function app_env(string $key, mixed $default = null): mixed
 
 function app_send_password_reset_otp(string $email, string $otp): bool
 {
+    return app_send_mail($email, 'Ma OTP dat lai mat khau', "Xin chào,\r\n\r\nMã OTP đặt lại mật khẩu của bạn là: " . $otp . "\r\nMã có hiệu lực trong 60 giây và chỉ dùng một lần.\r\n\r\nNếu bạn không yêu cầu mã này, hãy bỏ qua email.\r\n");
+}
+
+// Gửi một email văn bản qua SMTP (Gmail) đã cấu hình trong .env; trả về false nếu chưa cấu hình hoặc gửi lỗi.
+function app_send_mail(string $email, string $subject, string $body): bool
+{
     $fallbackSender = (string) (app_env('MAIL_USERNAME', '') ?: '');
     $sender = (string) (app_env('MAIL_FROM', $fallbackSender) ?: $fallbackSender);
     $username = (string) (app_env('MAIL_USERNAME', $sender) ?: $sender);
     $password = (string) (app_env('MAIL_PASSWORD', '') ?: '');
     if (!filter_var($sender, FILTER_VALIDATE_EMAIL) || !filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
-        error_log('InternTrack password reset OTP could not be sent: MAIL_FROM or MAIL_PASSWORD is not configured.');
+        error_log('InternTrack mail could not be sent: MAIL_FROM or MAIL_PASSWORD is not configured.');
         return false;
     }
 
@@ -183,8 +197,8 @@ function app_send_password_reset_otp(string $email, string $otp): bool
         $mailer->CharSet = 'UTF-8';
         $mailer->setFrom($sender, (string) (app_env('MAIL_FROM_NAME', APP_NAME) ?: APP_NAME));
         $mailer->addAddress($email);
-        $mailer->Subject = 'InternTrack - Ma OTP dat lai mat khau';
-        $mailer->Body = "Xin chào,\r\n\r\nMã OTP đặt lại mật khẩu InternTrack của bạn là: " . $otp . "\r\nMã có hiệu lực trong 60 giây và chỉ dùng một lần.\r\n\r\nNếu bạn không yêu cầu mã này, hãy bỏ qua email.\r\n";
+        $mailer->Subject = 'DH Vinh - ' . $subject;
+        $mailer->Body = $body;
         $mailer->send();
         return true;
     } catch (Throwable $error) {
@@ -207,4 +221,17 @@ function app_redirect(string $page): never
     }
     header('Location: ' . $location, true, 303);
     exit;
+}
+
+// Trang bị ẩn / chặn theo quyền chi tiết của tài khoản (ngoài vai trò):
+// người hướng dẫn tại doanh nghiệp chỉ làm việc với thực tập sinh được giao; quản trị khoa không dùng công cụ toàn hệ thống.
+function app_hidden_pages(array $user): array
+{
+    if (($user['role'] ?? '') === 'company' && !empty($user['is_mentor'])) {
+        return ['company/positions', 'company/applications', 'company/profile'];
+    }
+    if (($user['role'] ?? '') === 'admin' && !empty($user['scope_faculty'])) {
+        return ['admin/audit', 'admin/documents', 'admin/companies', 'admin/positions', 'admin/templates'];
+    }
+    return [];
 }

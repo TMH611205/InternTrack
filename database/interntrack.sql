@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(150) NOT NULL,
     phone VARCHAR(20) NULL,
     avatar VARCHAR(255) NULL,
+    -- google_sub: tài khoản Google (email trường) đã liên kết để đăng nhập SSO.
+    google_sub VARCHAR(64) NULL,
+    -- scope_faculty: quản trị cấp khoa (trưởng khoa) chỉ thấy dữ liệu của khoa này; NULL = toàn trường.
+    scope_faculty VARCHAR(150) NULL,
     role ENUM('student', 'company', 'lecturer', 'admin') NOT NULL,
     status ENUM('active', 'inactive', 'locked') NOT NULL DEFAULT 'active',
     last_login_at DATETIME NULL,
@@ -32,6 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
 
     CONSTRAINT uq_users_username UNIQUE (username),
     CONSTRAINT uq_users_email UNIQUE (email),
+    CONSTRAINT uq_users_google_sub UNIQUE (google_sub),
     CONSTRAINT ck_users_email CHECK (email LIKE '%_@_%._%'),
     CONSTRAINT ck_users_phone CHECK (phone IS NULL OR phone REGEXP '^[0-9+() .-]{8,20}$'),
 
@@ -50,11 +55,17 @@ CREATE TABLE IF NOT EXISTS students (
     gender ENUM('male', 'female', 'other') NULL,
     address VARCHAR(255) NULL,
     major VARCHAR(150) NULL,
+    specialization VARCHAR(150) NULL,
     class_name VARCHAR(100) NULL,
     faculty VARCHAR(150) NULL,
     university VARCHAR(200) NULL,
     cv_file VARCHAR(255) NULL,
     bio TEXT NULL,
+    gpa DECIMAL(3,2) NULL,
+    credits SMALLINT UNSIGNED NULL,
+    training_system VARCHAR(60) NULL,
+    skills TEXT NULL,
+    interests TEXT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -84,6 +95,11 @@ CREATE TABLE IF NOT EXISTS companies (
     address VARCHAR(255) NULL,
     description TEXT NULL,
     logo VARCHAR(255) NULL,
+    field VARCHAR(150) NULL,
+    contact_name VARCHAR(150) NULL,
+    contact_position VARCHAR(150) NULL,
+    mou_status ENUM('none', 'negotiating', 'signed', 'expired') NOT NULL DEFAULT 'none',
+    mou_expires DATE NULL,
     status ENUM('pending', 'active', 'inactive', 'rejected') NOT NULL DEFAULT 'pending',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -108,8 +124,14 @@ CREATE TABLE IF NOT EXISTS lecturers (
     user_id BIGINT UNSIGNED NOT NULL,
     lecturer_code VARCHAR(30) NOT NULL,
     department VARCHAR(150) NULL,
+    faculty VARCHAR(150) NULL,
     academic_title VARCHAR(100) NULL,
     specialization VARCHAR(200) NULL,
+    research_areas TEXT NULL,
+    max_students TINYINT UNSIGNED NOT NULL DEFAULT 8,
+    max_reviews TINYINT UNSIGNED NOT NULL DEFAULT 10,
+    max_councils TINYINT UNSIGNED NOT NULL DEFAULT 6,
+    is_head TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -136,7 +158,10 @@ CREATE TABLE IF NOT EXISTS positions (
     location VARCHAR(255) NULL,
     quantity INT UNSIGNED NOT NULL DEFAULT 1,
     deadline DATE NULL,
-    status ENUM('draft', 'open', 'closed', 'cancelled') NOT NULL DEFAULT 'draft',
+    -- pending: doanh nghiệp gửi đăng, chờ khoa duyệt; approved_at: thời điểm khoa duyệt (tin đã duyệt mở lại không cần duyệt lại).
+    status ENUM('draft', 'pending', 'open', 'closed', 'cancelled') NOT NULL DEFAULT 'draft',
+    approved_at DATETIME NULL,
+    review_note VARCHAR(500) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -162,6 +187,8 @@ CREATE TABLE IF NOT EXISTS internships (
     company_id BIGINT UNSIGNED NOT NULL,
     position_id BIGINT UNSIGNED NOT NULL,
     lecturer_id BIGINT UNSIGNED NULL,
+    -- Người hướng dẫn tại doanh nghiệp (tài khoản trong company_mentors).
+    mentor_user_id BIGINT UNSIGNED NULL,
 
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
@@ -177,6 +204,8 @@ CREATE TABLE IF NOT EXISTS internships (
     description TEXT NULL,
     training_plan TEXT NULL,
     final_score DECIMAL(5,2) NULL,
+    batch_id BIGINT UNSIGNED NULL,
+    self_found TINYINT(1) NOT NULL DEFAULT 0,
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -237,6 +266,8 @@ CREATE TABLE IF NOT EXISTS applications (
     reviewed_at DATETIME NULL,
     reviewed_by BIGINT UNSIGNED NULL,
     note TEXT NULL,
+    interview_at DATETIME NULL,
+    interview_place VARCHAR(255) NULL,
 
     CONSTRAINT fk_applications_student
         FOREIGN KEY (student_id) REFERENCES students(id)
@@ -334,6 +365,10 @@ CREATE TABLE IF NOT EXISTS diaries (
     lecturer_feedback TEXT NULL,
     reviewed_by BIGINT UNSIGNED NULL,
     reviewed_at DATETIME NULL,
+    -- Người hướng dẫn tại doanh nghiệp xác nhận nội dung nhật ký (confirmed) hoặc ghi chú chưa đúng (flagged).
+    company_status ENUM('confirmed', 'flagged') NULL,
+    company_note VARCHAR(1000) NULL,
+    company_reviewed_at DATETIME NULL,
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -428,6 +463,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
     evaluator_user_id BIGINT UNSIGNED NOT NULL,
 
     evaluator_type ENUM('company', 'lecturer') NOT NULL,
+    rubric_id BIGINT UNSIGNED NULL,
 
     technical_score DECIMAL(5,2) NULL,
     attitude_score DECIMAL(5,2) NULL,
@@ -436,6 +472,8 @@ CREATE TABLE IF NOT EXISTS evaluations (
     overall_score DECIMAL(5,2) NULL,
 
     comments TEXT NULL,
+    -- Doanh nghiệp xác nhận tuyển dụng / giữ lại sinh viên sau thực tập.
+    offered TINYINT(1) NOT NULL DEFAULT 0,
 
     status ENUM('draft', 'submitted') NOT NULL DEFAULT 'draft',
     submitted_at DATETIME NULL,
@@ -820,6 +858,625 @@ CREATE TABLE IF NOT EXISTS skill_suggestions (
 
     INDEX idx_skill_suggestions_diary (diary_id, status),
     INDEX idx_skill_suggestions_internship (internship_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 16. DANH MỤC CHUNG: năm học/học kỳ, ngành, cấu hình hệ thống
+-- ============================================================
+CREATE TABLE IF NOT EXISTS academic_terms (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    school_year VARCHAR(20) NOT NULL,
+    semester TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    start_date DATE NULL,
+    end_date DATE NULL,
+    is_current TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_academic_terms UNIQUE (school_year, semester)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS majors (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(30) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    faculty VARCHAR(150) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_majors_code UNIQUE (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Chuyên ngành thuộc một ngành (danh mục chung).
+CREATE TABLE IF NOT EXISTS specializations (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    major_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    CONSTRAINT uq_specializations UNIQUE (major_id, name),
+    CONSTRAINT fk_specializations_major FOREIGN KEY (major_id) REFERENCES majors(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key VARCHAR(60) PRIMARY KEY,
+    setting_value TEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 17. NHẬT KÝ HỆ THỐNG (audit log): ai làm gì, lúc nào
+-- ============================================================
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NULL,
+    role VARCHAR(20) NULL,
+    action VARCHAR(60) NOT NULL,
+    target VARCHAR(255) NULL,
+    details TEXT NULL,
+    -- Giá trị trước / sau khi sửa: JSON {trường: [cũ, mới]}.
+    changes TEXT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_logs_user FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX idx_audit_logs_created (created_at),
+    INDEX idx_audit_logs_action (action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 18. ĐỢT THỰC TẬP / ĐỢT ĐỒ ÁN, mốc thời gian và danh sách đủ điều kiện
+-- ============================================================
+CREATE TABLE IF NOT EXISTS batches (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    term_id BIGINT UNSIGNED NULL,
+    batch_type ENUM('internship', 'thesis') NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    major_id BIGINT UNSIGNED NULL,
+    specialization_id BIGINT UNSIGNED NULL,
+    training_system VARCHAR(60) NULL,
+    min_credits SMALLINT UNSIGNED NULL,
+    min_gpa DECIMAL(3,2) NULL,
+    prerequisites TEXT NULL,
+    -- Mã học phần bắt buộc đã đạt (ngăn cách bằng dấu phẩy), đối chiếu với student_courses.
+    required_courses VARCHAR(500) NULL,
+    allow_student_proposals TINYINT(1) NOT NULL DEFAULT 1,
+    -- Đợt thực tập: 1 = khoa phân bổ sinh viên vào vị trí theo nguyện vọng (ngoài ứng tuyển trực tiếp).
+    allocation_mode TINYINT(1) NOT NULL DEFAULT 0,
+    max_preferences TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    group_max_size TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    supervisor_weight DECIMAL(4,2) NOT NULL DEFAULT 0.40,
+    reviewer_weight DECIMAL(4,2) NOT NULL DEFAULT 0.20,
+    council_weight DECIMAL(4,2) NOT NULL DEFAULT 0.40,
+    pass_score DECIMAL(4,2) NOT NULL DEFAULT 5.00,
+    supervisor_rubric_id BIGINT UNSIGNED NULL,
+    reviewer_rubric_id BIGINT UNSIGNED NULL,
+    council_rubric_id BIGINT UNSIGNED NULL,
+    -- Đợt thực tập: rubric doanh nghiệp / giảng viên dùng khi đánh giá (trống = 4 tiêu chí mặc định).
+    company_rubric_id BIGINT UNSIGNED NULL,
+    lecturer_rubric_id BIGINT UNSIGNED NULL,
+    results_published_at DATETIME NULL,
+    status ENUM('draft', 'open', 'closed') NOT NULL DEFAULT 'draft',
+    locked_at DATETIME NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_batches_term FOREIGN KEY (term_id) REFERENCES academic_terms(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_batches_major FOREIGN KEY (major_id) REFERENCES majors(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX idx_batches_type_status (batch_type, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Mốc thời gian của đợt. kind: topic_registration, preference, matching, report_1, report_2, report_final, evaluation, defense, close.
+-- Chức năng gắn với một mốc chỉ mở trong khoảng starts_at – ends_at (mốc chưa đặt thì không giới hạn).
+CREATE TABLE IF NOT EXISTS batch_milestones (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    kind VARCHAR(30) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    CONSTRAINT fk_batch_milestones_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_batch_milestone_kind UNIQUE (batch_id, kind),
+    INDEX idx_batch_milestones_end (ends_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS batch_students (
+    batch_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    eligible TINYINT(1) NOT NULL DEFAULT 1,
+    note VARCHAR(255) NULL,
+    PRIMARY KEY (batch_id, student_id),
+    CONSTRAINT fk_batch_students_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_batch_students_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 19. ĐỀ TÀI ĐỒ ÁN, nhóm, nguyện vọng và xếp hạng hai phía
+-- ============================================================
+CREATE TABLE IF NOT EXISTS topics (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    lecturer_id BIGINT UNSIGNED NULL,
+    proposed_by_student_id BIGINT UNSIGNED NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    objectives TEXT NULL,
+    requirements TEXT NULL,
+    technologies VARCHAR(255) NULL,
+    field VARCHAR(150) NULL,
+    max_students TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    attachment_path VARCHAR(255) NULL,
+    attachment_name VARCHAR(255) NULL,
+    -- dept_approved: trưởng bộ môn đã duyệt, chờ khoa / phòng đào tạo duyệt (khi bật duyệt 2 cấp).
+    status ENUM('draft', 'pending', 'dept_approved', 'revision', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+    review_note TEXT NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    reviewed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_topics_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_topics_lecturer FOREIGN KEY (lecturer_id) REFERENCES lecturers(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_topics_student FOREIGN KEY (proposed_by_student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_topics_max CHECK (max_students BETWEEN 1 AND 10),
+    INDEX idx_topics_batch_status (batch_id, status),
+    INDEX idx_topics_lecturer (lecturer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS thesis_groups (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    leader_student_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_thesis_groups_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_thesis_groups_leader FOREIGN KEY (leader_student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS thesis_group_members (
+    group_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    status ENUM('invited', 'accepted', 'declined') NOT NULL DEFAULT 'invited',
+    responded_at DATETIME NULL,
+    PRIMARY KEY (group_id, student_id),
+    CONSTRAINT fk_group_members_group FOREIGN KEY (group_id) REFERENCES thesis_groups(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_group_members_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS topic_preferences (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    topic_id BIGINT UNSIGNED NOT NULL,
+    rank_no TINYINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_topic_preferences_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_topic_preferences_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_topic_preferences_topic FOREIGN KEY (topic_id) REFERENCES topics(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_topic_preference_rank UNIQUE (batch_id, student_id, rank_no),
+    CONSTRAINT uq_topic_preference_topic UNIQUE (batch_id, student_id, topic_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS lecturer_rankings (
+    topic_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    rank_no SMALLINT UNSIGNED NOT NULL,
+    PRIMARY KEY (topic_id, student_id),
+    CONSTRAINT fk_lecturer_rankings_topic FOREIGN KEY (topic_id) REFERENCES topics(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_lecturer_rankings_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 20. GHÉP CẶP: lịch sử mỗi lần chạy (tham số, kết quả, chỉ số)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS matching_runs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    algorithm VARCHAR(40) NOT NULL,
+    params TEXT NOT NULL,
+    result MEDIUMTEXT NOT NULL,
+    metrics TEXT NOT NULL,
+    status ENUM('preview', 'published', 'discarded') NOT NULL DEFAULT 'preview',
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    published_at DATETIME NULL,
+    CONSTRAINT fk_matching_runs_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX idx_matching_runs_batch (batch_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 21. HỘI ĐỒNG BẢO VỆ và ĐỒ ÁN (kết quả ghép sinh viên – đề tài – giảng viên)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS councils (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    room VARCHAR(100) NULL,
+    defense_date DATE NULL,
+    start_time TIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_councils_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS council_members (
+    council_id BIGINT UNSIGNED NOT NULL,
+    lecturer_id BIGINT UNSIGNED NOT NULL,
+    member_role ENUM('chair', 'secretary', 'member') NOT NULL DEFAULT 'member',
+    PRIMARY KEY (council_id, lecturer_id),
+    CONSTRAINT fk_council_members_council FOREIGN KEY (council_id) REFERENCES councils(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_council_members_lecturer FOREIGN KEY (lecturer_id) REFERENCES lecturers(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theses (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    topic_id BIGINT UNSIGNED NOT NULL,
+    group_id BIGINT UNSIGNED NULL,
+    supervisor_id BIGINT UNSIGNED NULL,
+    reviewer_id BIGINT UNSIGNED NULL,
+    council_id BIGINT UNSIGNED NULL,
+    defense_at DATETIME NULL,
+    source ENUM('auto', 'manual', 'proposal') NOT NULL DEFAULT 'auto',
+    matched_rank TINYINT UNSIGNED NULL,
+    locked TINYINT(1) NOT NULL DEFAULT 0,
+    status ENUM('assigned', 'confirmed', 'declined', 'in_progress', 'completed') NOT NULL DEFAULT 'assigned',
+    student_confirmed_at DATETIME NULL,
+    final_score DECIMAL(4,2) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_theses_batch_student UNIQUE (batch_id, student_id),
+    CONSTRAINT fk_theses_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_theses_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_theses_topic FOREIGN KEY (topic_id) REFERENCES topics(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_theses_group FOREIGN KEY (group_id) REFERENCES thesis_groups(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_theses_supervisor FOREIGN KEY (supervisor_id) REFERENCES lecturers(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_theses_reviewer FOREIGN KEY (reviewer_id) REFERENCES lecturers(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_theses_council FOREIGN KEY (council_id) REFERENCES councils(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX idx_theses_topic (topic_id),
+    INDEX idx_theses_supervisor (supervisor_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Kế hoạch làm việc / mốc công việc giữa sinh viên và giảng viên hướng dẫn.
+CREATE TABLE IF NOT EXISTS thesis_milestones (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    thesis_id BIGINT UNSIGNED NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT NULL,
+    due_date DATE NULL,
+    status ENUM('todo', 'done') NOT NULL DEFAULT 'todo',
+    created_by BIGINT UNSIGNED NULL,
+    completed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_thesis_milestones_thesis FOREIGN KEY (thesis_id) REFERENCES theses(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Nhật ký gặp mặt / lịch hẹn hướng dẫn; giảng viên xác nhận buổi đã diễn ra.
+CREATE TABLE IF NOT EXISTS thesis_meetings (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    thesis_id BIGINT UNSIGNED NOT NULL,
+    meeting_at DATETIME NOT NULL,
+    location VARCHAR(200) NULL,
+    agenda TEXT NULL,
+    notes TEXT NULL,
+    status ENUM('scheduled', 'held', 'cancelled') NOT NULL DEFAULT 'scheduled',
+    confirmed_at DATETIME NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_thesis_meetings_thesis FOREIGN KEY (thesis_id) REFERENCES theses(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX idx_thesis_meetings_time (meeting_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Bài nộp theo giai đoạn; mỗi lần nộp lại là một phiên bản mới, đánh dấu nộp trễ theo mốc của đợt.
+CREATE TABLE IF NOT EXISTS thesis_submissions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    thesis_id BIGINT UNSIGNED NOT NULL,
+    stage VARCHAR(30) NOT NULL,
+    version SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    file_path VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_size INT UNSIGNED NOT NULL DEFAULT 0,
+    note TEXT NULL,
+    is_late TINYINT(1) NOT NULL DEFAULT 0,
+    -- Độ trùng nội dung cao nhất (%) với bài nộp của đồ án khác trong hệ thống, và bài nộp đó.
+    similarity DECIMAL(5,2) NULL,
+    similar_submission_id BIGINT UNSIGNED NULL,
+    status ENUM('submitted', 'reviewed', 'revision') NOT NULL DEFAULT 'submitted',
+    submitted_by BIGINT UNSIGNED NULL,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_thesis_submissions_thesis FOREIGN KEY (thesis_id) REFERENCES theses(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX idx_thesis_submissions_stage (thesis_id, stage, version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Góp ý trực tiếp trên từng phiên bản bài nộp.
+CREATE TABLE IF NOT EXISTS submission_comments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    submission_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    body TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_submission_comments_submission FOREIGN KEY (submission_id) REFERENCES thesis_submissions(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_submission_comments_user FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 22. RUBRIC (thư viện tiêu chí chấm, dùng lại giữa các đợt) và phiếu chấm đồ án
+-- ============================================================
+CREATE TABLE IF NOT EXISTS rubrics (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    applies_to ENUM('supervisor', 'reviewer', 'council', 'any', 'internship_company', 'internship_lecturer') NOT NULL DEFAULT 'any',
+    description TEXT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS rubric_criteria (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    rubric_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    description TEXT NULL,
+    weight DECIMAL(5,2) NOT NULL DEFAULT 1.00,
+    max_score DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+    levels TEXT NULL,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    CONSTRAINT fk_rubric_criteria_rubric FOREIGN KEY (rubric_id) REFERENCES rubrics(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS thesis_scores (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    thesis_id BIGINT UNSIGNED NOT NULL,
+    evaluator_user_id BIGINT UNSIGNED NOT NULL,
+    evaluator_role ENUM('supervisor', 'reviewer', 'council') NOT NULL,
+    rubric_id BIGINT UNSIGNED NULL,
+    total DECIMAL(4,2) NULL,
+    comments TEXT NULL,
+    status ENUM('draft', 'submitted') NOT NULL DEFAULT 'draft',
+    submitted_at DATETIME NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_thesis_scores UNIQUE (thesis_id, evaluator_user_id, evaluator_role),
+    CONSTRAINT fk_thesis_scores_thesis FOREIGN KEY (thesis_id) REFERENCES theses(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_thesis_scores_user FOREIGN KEY (evaluator_user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_thesis_scores_rubric FOREIGN KEY (rubric_id) REFERENCES rubrics(id) ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS thesis_score_items (
+    score_id BIGINT UNSIGNED NOT NULL,
+    criterion_id BIGINT UNSIGNED NOT NULL,
+    score DECIMAL(5,2) NOT NULL,
+    PRIMARY KEY (score_id, criterion_id),
+    CONSTRAINT fk_thesis_score_items_score FOREIGN KEY (score_id) REFERENCES thesis_scores(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_thesis_score_items_criterion FOREIGN KEY (criterion_id) REFERENCES rubric_criteria(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Điểm từng tiêu chí khi đánh giá thực tập theo rubric (evaluations.rubric_id).
+CREATE TABLE IF NOT EXISTS evaluation_items (
+    evaluation_id BIGINT UNSIGNED NOT NULL,
+    criterion_id BIGINT UNSIGNED NOT NULL,
+    score DECIMAL(5,2) NOT NULL,
+    PRIMARY KEY (evaluation_id, criterion_id),
+    CONSTRAINT fk_evaluation_items_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluations(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_evaluation_items_criterion FOREIGN KEY (criterion_id) REFERENCES rubric_criteria(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Phúc khảo / yêu cầu đánh giá lại điểm đồ án.
+CREATE TABLE IF NOT EXISTS regrade_requests (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    thesis_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    reason TEXT NOT NULL,
+    status ENUM('pending', 'accepted', 'rejected') NOT NULL DEFAULT 'pending',
+    response TEXT NULL,
+    handled_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    handled_at DATETIME NULL,
+    CONSTRAINT fk_regrade_thesis FOREIGN KEY (thesis_id) REFERENCES theses(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_regrade_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 23. THÔNG BÁO CHUNG theo đợt / lớp / vai trò
+-- ============================================================
+CREATE TABLE IF NOT EXISTS announcements (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    body TEXT NOT NULL,
+    audience ENUM('all', 'student', 'lecturer', 'company') NOT NULL DEFAULT 'all',
+    batch_id BIGINT UNSIGNED NULL,
+    class_name VARCHAR(100) NULL,
+    -- Gửi theo nhóm (nhóm đồ án, sinh viên một giảng viên hướng dẫn, thực tập sinh của đơn vị): id người nhận, cách nhau dấu phẩy.
+    recipients MEDIUMTEXT NULL,
+    group_label VARCHAR(200) NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_announcements_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    INDEX idx_announcements_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 24. THỰC TẬP MỞ RỘNG: tự tìm nơi thực tập, giấy tờ, chuyên cần, sinh viên đánh giá đơn vị
+-- ============================================================
+CREATE TABLE IF NOT EXISTS self_placements (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    student_id BIGINT UNSIGNED NOT NULL,
+    company_name VARCHAR(200) NOT NULL,
+    tax_code VARCHAR(50) NULL,
+    address VARCHAR(255) NOT NULL,
+    contact_name VARCHAR(150) NOT NULL,
+    contact_phone VARCHAR(20) NULL,
+    contact_email VARCHAR(255) NULL,
+    position_title VARCHAR(200) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    description TEXT NULL,
+    file_path VARCHAR(255) NULL,
+    status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+    review_note TEXT NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    internship_id BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_self_placements_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_self_placements_internship FOREIGN KEY (internship_id) REFERENCES internships(id) ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS internship_documents (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    internship_id BIGINT UNSIGNED NOT NULL,
+    doc_type ENUM('gioi_thieu', 'tiep_nhan', 'cam_ket', 'xac_nhan', 'khac') NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    uploaded_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_internship_documents_internship FOREIGN KEY (internship_id) REFERENCES internships(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS attendance (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    internship_id BIGINT UNSIGNED NOT NULL,
+    att_date DATE NOT NULL,
+    status ENUM('present', 'late', 'absent', 'excused') NOT NULL DEFAULT 'present',
+    note VARCHAR(255) NULL,
+    recorded_by BIGINT UNSIGNED NULL,
+    CONSTRAINT uq_attendance_day UNIQUE (internship_id, att_date),
+    CONSTRAINT fk_attendance_internship FOREIGN KEY (internship_id) REFERENCES internships(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS company_reviews (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    internship_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    rating TINYINT UNSIGNED NOT NULL,
+    mentoring_rating TINYINT UNSIGNED NOT NULL,
+    would_recommend TINYINT(1) NOT NULL DEFAULT 1,
+    got_offer TINYINT(1) NOT NULL DEFAULT 0,
+    comments TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_company_reviews_internship UNIQUE (internship_id),
+    CONSTRAINT fk_company_reviews_internship FOREIGN KEY (internship_id) REFERENCES internships(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_company_reviews_rating CHECK (rating BETWEEN 1 AND 5 AND mentoring_rating BETWEEN 1 AND 5)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 25. NHIỀU VAI TRÒ VÀ NGƯỜI HƯỚNG DẪN TẠI DOANH NGHIỆP
+-- ============================================================
+-- Vai trò bổ sung ngoài users.role (ví dụ giảng viên kiêm quản trị khoa); người dùng chuyển vai trò ở thanh bên.
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id BIGINT UNSIGNED NOT NULL,
+    role ENUM('lecturer', 'admin') NOT NULL,
+    PRIMARY KEY (user_id, role),
+    CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tài khoản người hướng dẫn tại doanh nghiệp (users.role = 'company'): chỉ thấy thực tập sinh được giao (internships.mentor_user_id).
+CREATE TABLE IF NOT EXISTS company_mentors (
+    user_id BIGINT UNSIGNED PRIMARY KEY,
+    company_id BIGINT UNSIGNED NOT NULL,
+    job_title VARCHAR(150) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_company_mentors_user FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_company_mentors_company FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 26. HỌC PHẦN ĐÃ ĐẠT, HẠN MỨC THEO ĐỢT, CHẤM THEO GIAI ĐOẠN
+-- ============================================================
+-- Học phần sinh viên đã đạt (nhập từ hệ thống đào tạo), dùng kiểm tra học phần tiên quyết của đợt.
+CREATE TABLE IF NOT EXISTS student_courses (
+    student_id BIGINT UNSIGNED NOT NULL,
+    course_code VARCHAR(30) NOT NULL,
+    course_name VARCHAR(200) NULL,
+    PRIMARY KEY (student_id, course_code),
+    CONSTRAINT fk_student_courses_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Hạn mức hướng dẫn riêng của giảng viên trong một đợt (không có thì dùng lecturers.max_students).
+CREATE TABLE IF NOT EXISTS batch_lecturer_quotas (
+    batch_id BIGINT UNSIGNED NOT NULL,
+    lecturer_id BIGINT UNSIGNED NOT NULL,
+    max_students TINYINT UNSIGNED NOT NULL,
+    PRIMARY KEY (batch_id, lecturer_id),
+    CONSTRAINT fk_batch_quotas_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_batch_quotas_lecturer FOREIGN KEY (lecturer_id) REFERENCES lecturers(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Điểm giảng viên hướng dẫn chấm cho từng giai đoạn nộp bài (báo cáo tiến độ, mốc tùy chọn...).
+CREATE TABLE IF NOT EXISTS thesis_stage_scores (
+    thesis_id BIGINT UNSIGNED NOT NULL,
+    stage VARCHAR(30) NOT NULL,
+    score DECIMAL(4,2) NOT NULL,
+    comments TEXT NULL,
+    scored_by BIGINT UNSIGNED NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (thesis_id, stage),
+    CONSTRAINT fk_stage_scores_thesis FOREIGN KEY (thesis_id) REFERENCES theses(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dấu vân tay nội dung (crc32 các cụm 5 từ) của bài nộp, để so trùng lặp giữa các đồ án.
+CREATE TABLE IF NOT EXISTS submission_fingerprints (
+    submission_id BIGINT UNSIGNED PRIMARY KEY,
+    word_count INT UNSIGNED NOT NULL DEFAULT 0,
+    hashes MEDIUMTEXT NULL,
+    CONSTRAINT fk_fingerprints_submission FOREIGN KEY (submission_id) REFERENCES thesis_submissions(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 27. THỰC TẬP: NGUYỆN VỌNG PHÂN BỔ, ĐỔI / RÚT ĐƠN VỊ, ĐỀ CƯƠNG THEO TUẦN
+-- ============================================================
+CREATE TABLE IF NOT EXISTS internship_preferences (
+    batch_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    rank_no TINYINT UNSIGNED NOT NULL,
+    position_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (batch_id, student_id, rank_no),
+    CONSTRAINT fk_internship_prefs_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_internship_prefs_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_internship_prefs_position FOREIGN KEY (position_id) REFERENCES positions(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS internship_change_requests (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    internship_id BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    request_type ENUM('withdraw', 'change') NOT NULL,
+    reason TEXT NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+    response TEXT NULL,
+    handled_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    handled_at DATETIME NULL,
+    CONSTRAINT fk_change_requests_internship FOREIGN KEY (internship_id) REFERENCES internships(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_change_requests_student FOREIGN KEY (student_id) REFERENCES students(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS internship_weekly_plans (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    internship_id BIGINT UNSIGNED NOT NULL,
+    week_no TINYINT UNSIGNED NOT NULL,
+    goals TEXT NOT NULL,
+    result TEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_weekly_plans UNIQUE (internship_id, week_no),
+    CONSTRAINT fk_weekly_plans_internship FOREIGN KEY (internship_id) REFERENCES internships(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 28. BÁO CÁO THỰC TẬP THEO PHIÊN BẢN, BÌNH LUẬN BÁO CÁO / NHẬT KÝ
+-- ============================================================
+CREATE TABLE IF NOT EXISTS report_versions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    report_id BIGINT UNSIGNED NOT NULL,
+    version SMALLINT UNSIGNED NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content LONGTEXT NULL,
+    file_path VARCHAR(255) NULL,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_report_versions UNIQUE (report_id, version),
+    CONSTRAINT fk_report_versions_report FOREIGN KEY (report_id) REFERENCES reports(id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS item_comments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    item_type ENUM('report', 'diary') NOT NULL,
+    item_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    body TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_item_comments_user FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX idx_item_comments_item (item_type, item_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

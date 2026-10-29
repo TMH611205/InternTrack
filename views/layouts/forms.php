@@ -14,6 +14,36 @@ $csrfField = '<input type="hidden" name="_csrf" value="' . screen_escape(app_csr
 // Địa chỉ gửi form: luôn quay lại đúng màn hình hiện tại (giữ nhóm tài khoản ở admin/users).
 $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !empty($screenData['group']) ? '&group=' . rawurlencode($screenData['group']) : '');
 ?>
+<?php if ($screen === 'company/inters' && empty($user['is_mentor'])): ?>
+    <?php // [Doanh nghiệp · Thực tập sinh] Tài khoản người hướng dẫn tại đơn vị: mỗi người chỉ thấy thực tập sinh được giao. ?>
+    <button type="button" class="action-trigger" data-dialog-open="mentors"><span>Người hướng dẫn tại đơn vị (<?= count($screenData['mentors'] ?? []) ?>)</span><small>Tạo tài khoản, giao thực tập sinh</small></button>
+    <dialog class="modal modal--wide" id="mentors" aria-label="Người hướng dẫn tại đơn vị">
+        <div class="workspace-form modal-form">
+            <header class="modal-head"><div><p class="eyebrow">Người hướng dẫn tại đơn vị</p><h2>Tài khoản người hướng dẫn</h2><p class="modal-sub">Người hướng dẫn đăng nhập riêng, chỉ thấy và đánh giá thực tập sinh được giao.</p></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
+            <?php if (!empty($screenData['mentors'])): ?>
+                <ul class="x-plain-list">
+                    <?php foreach ($screenData['mentors'] as $mentor): ?>
+                        <li class="x-row-line"><span><strong><?= screen_escape($mentor['full_name']) ?></strong> · <?= screen_escape(trim(($mentor['job_title'] ?: '') . ' · ' . $mentor['email'], ' ·')) ?> · <?= (int) $mentor['load_count'] ?> thực tập sinh<?= $mentor['status'] !== 'active' ? ' · đã khóa' : '' ?></span>
+                            <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="mentor_toggle"><input type="hidden" name="mentor_user_id" value="<?= (int) $mentor['id'] ?>"><button type="submit"><?= $mentor['status'] === 'active' ? 'Khóa' : 'Mở khóa' ?></button></form></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form workspace-form--plain"><?= $csrfField ?><input type="hidden" name="action" value="mentor_create">
+                <p class="form-hint">Thêm người hướng dẫn</p>
+                <div class="form-grid">
+                    <label>Họ tên<input name="full_name" maxlength="150" required></label>
+                    <label>Chức vụ<input name="job_title" maxlength="150" placeholder="Trưởng nhóm phát triển"></label>
+                    <label>Email<input type="email" name="email" maxlength="255" required></label>
+                    <label>Điện thoại<input name="phone" maxlength="20"></label>
+                    <label>Tên đăng nhập<input name="username" maxlength="50" required></label>
+                    <label>Mật khẩu (≥ 10 ký tự)<input type="password" name="password" minlength="10" autocomplete="new-password" required></label>
+                </div>
+                <div class="modal-actions"><button type="button" class="button" data-dialog-close>Đóng</button><button class="button button--primary" type="submit">Tạo tài khoản</button></div>
+            </form>
+        </div>
+    </dialog>
+<?php endif; ?>
+
 <?php if ($screen === 'company/positions'): ?>
     <?php // [Doanh nghiệp · Vị trí tuyển] Nút và hộp thoại đăng vị trí tuyển dụng mới (action=position_save). ?>
     <button type="button" class="action-trigger" data-dialog-open="new-position"><span>+ Đăng vị trí mới</span><small>Tạo tin tuyển dụng cho doanh nghiệp</small></button>
@@ -21,14 +51,14 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
                 <header class="modal-head"><div><p class="eyebrow">Tạo tin tuyển dụng cho doanh nghiệp</p><h2>Đăng vị trí mới</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
             <?= $csrfField ?><input type="hidden" name="action" value="position_save">
-            <p class="form-hint">Tin công khai hiển thị tên và địa chỉ công ty từ hồ sơ doanh nghiệp. Ưu tiên cơ hội tại TP. Vinh, Nghệ An.</p>
+            <p class="form-hint">Tin được khoa duyệt trước khi hiển thị cho sinh viên.</p>
             <label>Tên vị trí<input name="title" maxlength="200" required></label>
             <label>Mô tả công việc<textarea name="description" rows="3" required></textarea></label>
             <label>Yêu cầu<textarea name="requirements" rows="2"></textarea></label>
             <label>Quyền lợi<textarea name="benefits" rows="2"></textarea></label>
             <div class="form-grid"><label>Nơi làm việc<input name="location" maxlength="255" placeholder="TP. Vinh, Nghệ An hoặc Từ xa"></label><label>Số lượng<input name="quantity" type="number" min="1" value="1" required></label><label>Hạn nhận hồ sơ<input name="deadline" type="date" min="<?= date('Y-m-d') ?>"></label><label>Trạng thái<select name="status">
-                        <option value="draft">Bản nháp</option>
-                        <option value="open">Đang mở</option>
+                        <option value="open">Gửi khoa duyệt</option>
+                        <option value="draft">Lưu bản nháp</option>
                     </select></label></div>
             <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu vị trí</button></div>
 
@@ -105,6 +135,8 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
             <?= $csrfField ?><input type="hidden" name="action" value="profile_save">
             <div class="form-grid"><label>Họ và tên<input name="full_name" maxlength="150" value="<?= screen_escape($user['full_name']) ?>" required></label><label>Số điện thoại<input name="phone" maxlength="20" value="<?= screen_escape($user['phone'] ?? '') ?>"></label><label>Địa chỉ<input name="address" maxlength="255" value="<?= screen_escape($screenData['profile_record']['address'] ?? '') ?>"></label></div>
             <label>Giới thiệu<textarea name="bio" rows="3" maxlength="5000"><?= screen_escape($screenData['profile_record']['bio'] ?? '') ?></textarea></label>
+            <div class="form-grid"><label>Kỹ năng (cách nhau bởi dấu phẩy)<input name="skills" maxlength="2000" value="<?= screen_escape($screenData['profile_record']['skills'] ?? '') ?>" placeholder="PHP, MySQL, Figma, tiếng Anh B1"></label><label>Lĩnh vực quan tâm<input name="interests" maxlength="2000" value="<?= screen_escape($screenData['profile_record']['interests'] ?? '') ?>" placeholder="Phát triển web, AI, IoT"></label></div>
+            <p class="form-hint">GPA và số tín chỉ được đồng bộ từ phòng đào tạo, sinh viên không tự sửa.</p>
             <label>Ảnh đại diện (JPG, PNG, WebP · tối đa 3 MB)<input name="avatar_file" type="file" accept="image/jpeg,image/png,image/webp"></label>
             <label>CV (PDF, DOC, DOCX · tối đa 5 MB)<input name="cv_file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
             <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu hồ sơ</button></div>
@@ -118,6 +150,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
                 <header class="modal-head"><div><p class="eyebrow">Cập nhật liên hệ và phần giới thiệu</p><h2>Chỉnh sửa thông tin doanh nghiệp</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
             <?= $csrfField ?><input type="hidden" name="action" value="profile_save">
             <div class="form-grid"><label>Người liên hệ<input name="full_name" maxlength="150" value="<?= screen_escape($user['full_name']) ?>" required></label><label>Điện thoại<input name="phone" maxlength="20" value="<?= screen_escape($user['phone'] ?? '') ?>"></label><label>Website<input name="website" maxlength="255" value="<?= screen_escape($screenData['profile_record']['website'] ?? '') ?>"></label><label>Email liên hệ<input name="company_email" type="email" maxlength="255" value="<?= screen_escape($screenData['profile_record']['email'] ?? $user['email']) ?>"></label><label>Địa chỉ công ty<input name="address" maxlength="255" placeholder="Số nhà, đường, phường, TP. Vinh, Nghệ An" value="<?= screen_escape($screenData['profile_record']['address'] ?? '') ?>" required></label></div>
+            <label>Lĩnh vực hoạt động<input name="field" maxlength="150" value="<?= screen_escape($screenData['profile_record']['field'] ?? '') ?>" placeholder="Phần mềm, tài chính, du lịch..."></label>
             <label>Giới thiệu<textarea name="description" rows="4" maxlength="10000"><?= screen_escape($screenData['profile_record']['description'] ?? '') ?></textarea></label>
             <label>Ảnh đại diện (JPG, PNG, WebP · tối đa 3 MB)<input name="avatar_file" type="file" accept="image/jpeg,image/png,image/webp"></label>
             <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu hồ sơ</button></div>
@@ -131,7 +164,8 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
                 <header class="modal-head"><div><p class="eyebrow">Cập nhật thông tin liên hệ và ảnh đại diện</p><h2>Chỉnh sửa hồ sơ</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
             <?= $csrfField ?><input type="hidden" name="action" value="profile_save">
             <div class="form-grid"><label>Họ và tên<input name="full_name" maxlength="150" value="<?= screen_escape($user['full_name']) ?>" required></label><label>Số điện thoại<input name="phone" maxlength="20" value="<?= screen_escape($user['phone'] ?? '') ?>"></label></div>
-            <?php if ($screen === 'lecturer/profile'): ?><label>Bộ môn / Khoa<input name="department" maxlength="150" value="<?= screen_escape($user['department'] ?? '') ?>"></label><?php endif; ?>
+            <?php if ($screen === 'lecturer/profile'): ?><div class="form-grid"><label>Bộ môn / Khoa<input name="department" maxlength="150" value="<?= screen_escape($user['department'] ?? '') ?>"></label><label>Chuyên môn<input name="specialization" maxlength="200" value="<?= screen_escape($screenData['profile_record']['specialization'] ?? '') ?>"></label></div>
+            <label>Hướng nghiên cứu (dùng để ghép phản biện, hội đồng đúng chuyên môn)<textarea name="research_areas" rows="2" maxlength="2000"><?= screen_escape($screenData['profile_record']['research_areas'] ?? '') ?></textarea></label><?php endif; ?>
             <label>Ảnh đại diện (JPG, PNG, WebP · tối đa 3 MB)<input name="avatar_file" type="file" accept="image/jpeg,image/png,image/webp"></label>
             <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Lưu hồ sơ</button></div>
         </form>
@@ -151,6 +185,18 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         </form>
     </dialog>
 <?php elseif ($screen === 'admin/users' && ($screenData['group'] ?? 'student') !== 'admin'): ?>
+    <?php // [Quản trị · Tài khoản] Nhập hàng loạt từ Excel (CSV/XLSX) và xuất danh sách (action=users_import, ?export=users). ?>
+    <button type="button" class="action-trigger" data-dialog-open="users-import"><span>⇪ Nhập từ Excel</span><small>Tạo mới hoặc cập nhật hàng loạt, đồng bộ GPA/tín chỉ</small></button>
+    <dialog class="modal" id="users-import" aria-label="Nhập tài khoản từ Excel">
+        <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
+            <header class="modal-head"><div><p class="eyebrow">Nhập dữ liệu hàng loạt</p><h2>Nhập tài khoản từ Excel</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
+            <?= $csrfField ?><input type="hidden" name="action" value="users_import">
+            <p class="form-hint">Dòng đầu là tên cột: role, email, full_name, code, major, class_name, gpa, credits, department, company_name… Email hoặc tên đăng nhập đã có thì cập nhật hồ sơ (dùng để đồng bộ GPA, tín chỉ từ hệ thống đào tạo). Tài khoản mới không có mật khẩu sẽ tự đặt qua chức năng Quên mật khẩu.</p>
+            <p><a class="table-download" href="?export=import_template">Tải tệp mẫu (.csv) ↓</a> · <a class="table-download" href="?export=users">Xuất toàn bộ tài khoản ↓</a></p>
+            <label>Tệp Excel (.xlsx) hoặc CSV UTF-8 · tối đa 5 MB<input name="import_file" type="file" accept=".xlsx,.csv" required></label>
+            <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Nhập dữ liệu</button></div>
+        </form>
+    </dialog>
     <?php // [Quản trị · Tài khoản] Tạo tài khoản sinh viên / giảng viên / doanh nghiệp (action=user_create). ?>
     <?php
     $createRole = in_array($screenData['group'] ?? '', ['student', 'lecturer', 'company'], true) ? $screenData['group'] : 'student';

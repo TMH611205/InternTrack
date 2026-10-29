@@ -6,9 +6,24 @@ declare(strict_types=1);
 const FINAL_SCORE_WEIGHTS = ['company' => 0.6, 'lecturer' => 0.4];
 const FINAL_PASS_SCORE = 50.0;
 
+// Trọng số điểm tổng kết thực tập (doanh nghiệp / giảng viên) và điểm đạt: phòng đào tạo chỉnh ở trang Cấu hình & mẫu biểu.
+function final_score_weights(): array
+{
+    $company = max(0.0, min(1.0, (float) app_setting('internship_company_weight', (string) FINAL_SCORE_WEIGHTS['company'])));
+    return ['company' => $company, 'lecturer' => round(1 - $company, 4)];
+}
+
+function final_pass_score(): float
+{
+    return (float) app_setting('internship_pass_score', (string) FINAL_PASS_SCORE);
+}
+
 require_once __DIR__ . '/AiMatchController.php';
 require_once __DIR__ . '/AiInsightController.php';
 require_once __DIR__ . '/MessageController.php';
+require_once __DIR__ . '/ThesisController.php';
+require_once __DIR__ . '/AdminToolsController.php';
+require_once __DIR__ . '/InternshipController.php';
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -216,6 +231,45 @@ function page_greeting(array $user, string $prefix = 'Chào'): string
 // $screen là mã màn hình dạng "<vai_trò>/<màn_hình>", $data là cấu hình mẫu lấy từ views/layouts/page-data.php,
 // $user là người đang đăng nhập. Mỗi `case` bên dưới truy vấn database rồi ghi đè/bổ sung các khóa của $data
 // (title, metrics, rows, cards, boards, ...) mà views/layouts/content.php sẽ dùng để vẽ giao diện.
+// Gắn phiên bản + bình luận vào các thẻ báo cáo.
+function page_attach_threads(array $cards): array
+{
+    $ids = array_column($cards, 'id');
+    $comments = item_comments('report', $ids);
+    $versions = report_versions($ids);
+    foreach ($cards as &$card) {
+        $card['comments'] = $comments[(int) $card['id']] ?? [];
+        $card['versions'] = $versions[(int) $card['id']] ?? [];
+    }
+    return $cards;
+}
+
+// Đề cương theo tuần do sinh viên lập, theo từng dòng kỳ thực tập (giảng viên / doanh nghiệp xem trong hộp thoại kế hoạch).
+function page_weekly_plans(array $internshipIds): array
+{
+    $byInternship = [];
+    if ($internshipIds) {
+        foreach (page_all('SELECT * FROM internship_weekly_plans WHERE internship_id IN (' . implode(',', array_fill(0, count($internshipIds), '?')) . ') ORDER BY week_no', array_values($internshipIds)) as $plan) {
+            $byInternship[(int) $plan['internship_id']][] = $plan;
+        }
+    }
+    return array_map(static fn($id) => $byInternship[(int) $id] ?? [], $internshipIds);
+}
+
+// Rubric (nếu đợt có) và điểm đã chấm theo tiêu chí cho từng dòng của bảng đánh giá thực tập.
+function page_evaluation_rubrics(array $rows, string $evaluatorType): array
+{
+    $rubrics = [];
+    $scores = [];
+    foreach ($rows as $row) {
+        $rubrics[] = internship_rubric($row, $evaluatorType);
+        $scores[] = !empty($row['evaluation_id'])
+            ? array_column(page_all('SELECT criterion_id, score FROM evaluation_items WHERE evaluation_id = ?', [(int) $row['evaluation_id']]), 'score', 'criterion_id')
+            : [];
+    }
+    return [$rubrics, $scores];
+}
+
 function load_screen_data(string $screen, array $data, array $user): array
 {
     $studentId = isset($user['student_id']) ? (int) $user['student_id'] : 0;
@@ -227,7 +281,7 @@ function load_screen_data(string $screen, array $data, array $user): array
     $taskLabels = ['todo' => 'Cần làm', 'in_progress' => 'Đang làm', 'submitted' => 'Chờ phản hồi', 'completed' => 'Hoàn tất', 'cancelled' => 'Đã hủy'];
     $diaryLabels = ['draft' => 'Bản nháp', 'submitted' => 'Chờ duyệt', 'approved' => 'Đã duyệt', 'rejected' => 'Cần chỉnh sửa'];
     $reportLabels = ['draft' => 'Bản nháp', 'submitted' => 'Chờ xem', 'reviewing' => 'Đang xem', 'approved' => 'Đã duyệt', 'rejected' => 'Cần chỉnh sửa'];
-    $positionLabels = ['draft' => 'Bản nháp', 'open' => 'Đang mở', 'closed' => 'Đã đóng', 'cancelled' => 'Đã hủy'];
+    $positionLabels = ['draft' => 'Bản nháp', 'pending' => 'Chờ khoa duyệt', 'open' => 'Đang mở', 'closed' => 'Đã đóng', 'cancelled' => 'Đã hủy'];
 
     switch ($screen) {
         case 'student/dashboard':
@@ -326,11 +380,18 @@ function load_screen_data(string $screen, array $data, array $user): array
         // Đơn ứng tuyển của sinh viên và trạng thái từng đơn.
         case 'student/applications':
             $applications = page_all(
-                'SELECT a.id, p.title, c.company_name, a.applied_at, a.status FROM applications a JOIN positions p ON p.id = a.position_id JOIN companies c ON c.id = p.company_id WHERE a.student_id = ? ORDER BY a.applied_at DESC',
+                'SELECT a.id, p.title, c.company_name, a.applied_at, a.status, a.interview_at, a.interview_place FROM applications a JOIN positions p ON p.id = a.position_id JOIN companies c ON c.id = p.company_id WHERE a.student_id = ? ORDER BY a.applied_at DESC',
                 [$studentId]
             );
 
-            $data['rows'] = array_map(static fn($row) => [$row['title'], $row['company_name'], page_date($row['applied_at']), page_status_label($row['status'], $applicationLabels)], $applications);
+            $data['columns'] = ['Vị trí', 'Doanh nghiệp', 'Ngày nộp', 'Phỏng vấn', 'Trạng thái'];
+            $data['rows'] = array_map(static fn($row) => [
+                $row['title'],
+                $row['company_name'],
+                page_date($row['applied_at']),
+                $row['interview_at'] && in_array($row['status'], ['pending', 'reviewing'], true) ? date('H:i d/m', (int) strtotime($row['interview_at'])) . ' · ' . $row['interview_place'] : '—',
+                page_status_label($row['status'], $applicationLabels),
+            ], $applications);
 
             $data['row_ids'] = array_column($applications, 'id');
 
@@ -373,15 +434,20 @@ function load_screen_data(string $screen, array $data, array $user): array
         case 'student/diary':
             $currentInternship = page_one('SELECT id FROM internships WHERE student_id = ? AND status IN (\'planned\', \'active\') ORDER BY start_date DESC LIMIT 1', [$studentId]);
             $data['internship_id'] = $currentInternship ? (int) $currentInternship['id'] : null;
-            $diaries = page_all('SELECT id, diary_date, title, content, hours_worked, status FROM diaries WHERE student_id = ? ORDER BY diary_date DESC', [$studentId]);
+            $diaries = page_all('SELECT id, diary_date, title, content, hours_worked, status, company_status, company_note FROM diaries WHERE student_id = ? ORDER BY diary_date DESC', [$studentId]);
 
             $data['activities'] = array_map(static fn($row) => [
                 'id' => (int) $row['id'],
                 'time' => page_date($row['diary_date']) . ' · ' . ($row['hours_worked'] ?? 0) . ' giờ',
-                'title' => $row['title'] ?: 'Nhật ký thực tập',
-                'description' => $row['content'],
+                'title' => ($row['title'] ?: 'Nhật ký thực tập') . ($row['company_status'] === 'confirmed' ? ' · Doanh nghiệp đã xác nhận' : ''),
+                'description' => $row['content'] . ($row['company_status'] === 'flagged' ? "\n\nDoanh nghiệp ghi chú: " . $row['company_note'] : ''),
                 'status' => page_status_label($row['status'], $diaryLabels),
             ], $diaries);
+            $diaryComments = item_comments('diary', array_column($diaries, 'id'));
+            foreach ($data['activities'] as &$activity) {
+                $activity['comments'] = $diaryComments[$activity['id']] ?? [];
+            }
+            unset($activity);
 
             $data['metrics'] = [
                 ['label' => 'Tổng nhật ký', 'value' => (string) count($diaries), 'note' => 'Các ngày đã ghi nhận'],
@@ -402,16 +468,26 @@ function load_screen_data(string $screen, array $data, array $user): array
                 ['communication_score', 'Giao tiếp'],
                 ['discipline_score', 'Kỷ luật'],
             ];
-            $data['criteria'] = array_map(static function ($criterion) use ($evaluations): array {
+            $data['criteria'] = [];
+            foreach ($criteria as $criterion) {
                 $scores = array_filter(array_column($evaluations, $criterion[0]), static fn($score) => $score !== null);
-                return ['name' => $criterion[1], 'score' => $scores ? (string) round(array_sum($scores) / count($scores)) : '0'];
-            }, $criteria);
+                if ($scores || !$evaluations) {
+                    $data['criteria'][] = ['name' => $criterion[1], 'score' => $scores ? (string) round(array_sum($scores) / count($scores)) : '0'];
+                }
+            }
+            // Đánh giá theo rubric của đợt: điểm từng tiêu chí quy về thang 100.
+            $evaluationIds = array_column($evaluations, 'id');
+            if ($evaluationIds) {
+                foreach (page_all('SELECT c.name, AVG(LEAST(1, ei.score / c.max_score)) * 100 AS percent FROM evaluation_items ei JOIN rubric_criteria c ON c.id = ei.criterion_id WHERE ei.evaluation_id IN (' . implode(',', array_fill(0, count($evaluationIds), '?')) . ') GROUP BY c.name ORDER BY MIN(c.sort_order)', $evaluationIds) as $row) {
+                    $data['criteria'][] = ['name' => $row['name'], 'score' => (string) round((float) $row['percent'])];
+                }
+            }
             $overallScores = array_filter(array_column($evaluations, 'overall_score'), static fn($score) => $score !== null);
             $averageScore = $overallScores ? round(array_sum($overallScores) / count($overallScores)) : 0;
             // Kỳ đã hoàn thành thì ưu tiên điểm tổng kết đã chốt (trọng số doanh nghiệp/giảng viên) thay vì điểm trung bình tạm tính.
             $finalRow = page_one('SELECT final_score FROM internships WHERE student_id = ? AND status = \'completed\' AND final_score IS NOT NULL ORDER BY actual_end_date DESC, id DESC LIMIT 1', [$studentId]);
             $scoreMetric = $finalRow
-                ? ['label' => 'Điểm tổng kết', 'value' => round((float) $finalRow['final_score'], 2) . '/100', 'note' => ((float) $finalRow['final_score'] >= FINAL_PASS_SCORE ? 'Đạt' : 'Chưa đạt') . ' · đã chốt khi hoàn thành kỳ']
+                ? ['label' => 'Điểm tổng kết', 'value' => round((float) $finalRow['final_score'], 2) . '/100', 'note' => ((float) $finalRow['final_score'] >= final_pass_score() ? 'Đạt' : 'Chưa đạt') . ' · đã chốt khi hoàn thành kỳ']
                 : ['label' => 'Điểm tổng hợp', 'value' => $averageScore . '/100', 'note' => count($evaluations) . ' đánh giá đã gửi (tạm tính)'];
 
             $data['metrics'] = [
@@ -478,6 +554,9 @@ function load_screen_data(string $screen, array $data, array $user): array
                 ['label' => 'Số điện thoại', 'value' => $user['phone'] ?: 'Chưa cập nhật'],
                 ['label' => 'Địa chỉ', 'value' => ($profile['address'] ?? '') ?: 'Chưa cập nhật'],
                 ['label' => 'Giới thiệu', 'value' => ($profile['bio'] ?? '') ?: 'Chưa có giới thiệu.'],
+                ['label' => 'GPA · Tín chỉ tích lũy', 'value' => (($profile['gpa'] ?? null) !== null ? $profile['gpa'] . '/4' : 'Chưa có GPA') . ' · ' . (($profile['credits'] ?? null) !== null ? $profile['credits'] . ' tín chỉ' : 'chưa cập nhật') . ' (đồng bộ từ phòng đào tạo)'],
+                ['label' => 'Kỹ năng', 'value' => ($profile['skills'] ?? '') ?: 'Chưa cập nhật.'],
+                ['label' => 'Lĩnh vực quan tâm', 'value' => ($profile['interests'] ?? '') ?: 'Chưa cập nhật.'],
             ];
             $skillLevelNames = array_values(AI_SKILL_LEVELS);
             $confirmedSkills = ai_confirmed_skills($studentId);
@@ -504,6 +583,7 @@ function load_screen_data(string $screen, array $data, array $user): array
                 'tag' => page_status_label($row['status'], $reportLabels),
                 'file_path' => $row['file_path'],
             ], $reports);
+            $data['cards'] = page_attach_threads($data['cards']);
             break;
 
         // ---------------------------------------------------------------------------
@@ -516,14 +596,14 @@ function load_screen_data(string $screen, array $data, array $user): array
             $data['eyebrow'] = (string) ($user['company_name'] ?? $data['eyebrow']);
             $positionCount = page_count('SELECT COUNT(*) FROM positions WHERE company_id = ? AND status = \'open\'', [$companyId]);
             $applicationCount = page_count('SELECT COUNT(*) FROM applications a JOIN positions p ON p.id = a.position_id WHERE p.company_id = ? AND a.status IN (\'pending\', \'reviewing\')', [$companyId]);
-            $internCount = page_count('SELECT COUNT(*) FROM internships WHERE company_id = ? AND status IN (\'active\', \'planned\')', [$companyId]);
+            $internCount = page_count('SELECT COUNT(*) FROM internships WHERE company_id = ? AND (@it_mentor IS NULL OR mentor_user_id = @it_mentor) AND status IN (\'active\', \'planned\')', [$companyId]);
 
             $data['metrics'] = [
                 ['label' => 'Vị trí đang tuyển', 'value' => (string) $positionCount, 'note' => 'Vị trí mở của doanh nghiệp'],
                 ['label' => 'Hồ sơ chờ xử lý', 'value' => (string) $applicationCount, 'note' => 'Cần xem xét và phản hồi'],
                 ['label' => 'Thực tập sinh', 'value' => (string) $internCount, 'note' => 'Kỳ thực tập đang hoạt động'],
             ];
-            $submittedEvaluations = page_count('SELECT COUNT(*) FROM evaluations e JOIN internships i ON i.id = e.internship_id WHERE i.company_id = ? AND e.evaluator_type = \'company\' AND e.status = \'submitted\'', [$companyId]);
+            $submittedEvaluations = page_count('SELECT COUNT(*) FROM evaluations e JOIN internships i ON i.id = e.internship_id WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) AND e.evaluator_type = \'company\' AND e.status = \'submitted\'', [$companyId]);
 
             $data['progress'] = ['label' => 'Đánh giá đã gửi', 'value' => ($internCount ? (int) round(min($internCount, $submittedEvaluations) * 100 / $internCount) : 0) . '%', 'note' => $submittedEvaluations . '/' . $internCount . ' kỳ thực tập có đánh giá'];
 
@@ -543,7 +623,7 @@ function load_screen_data(string $screen, array $data, array $user): array
             $parameters = $screen === 'company/positions' ? [$companyId] : [];
             $filter = $screen === 'company/positions' ? 'WHERE p.company_id = ?' : '';
             $positions = page_all(
-                'SELECT p.id, p.title, p.description, p.requirements, p.benefits, p.location, c.company_name, c.address AS company_address, p.quantity, p.deadline, p.status, COUNT(a.id) AS applicant_count FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id ' . $filter . ' GROUP BY p.id ORDER BY p.created_at DESC',
+                'SELECT p.id, p.title, p.description, p.requirements, p.benefits, p.location, c.company_name, c.address AS company_address, p.quantity, p.deadline, p.status, p.approved_at, p.review_note, COUNT(a.id) AS applicant_count FROM positions p JOIN companies c ON c.id = p.company_id LEFT JOIN applications a ON a.position_id = p.id ' . $filter . ' GROUP BY p.id ORDER BY p.created_at DESC',
                 $parameters
             );
 
@@ -552,7 +632,10 @@ function load_screen_data(string $screen, array $data, array $user): array
                     'id' => (int) $row['id'],
                     'title' => $row['title'],
                     'meta' => $row['quantity'] . ' vị trí · Hạn ' . page_date($row['deadline']),
-                    'description' => 'Công ty: ' . $row['company_name'] . ' · Địa chỉ: ' . ($row['company_address'] ?: 'Chưa cập nhật') . ' · ' . $row['applicant_count'] . ' hồ sơ',
+                    'description' => $row['status'] === 'draft' && $row['review_note']
+                        ? 'Khoa yêu cầu chỉnh sửa: ' . $row['review_note']
+                        : ($row['status'] === 'pending' ? 'Đang chờ khoa duyệt. Tin sẽ hiển thị cho sinh viên sau khi được duyệt.' : $row['location'] . ' · ' . $row['applicant_count'] . ' hồ sơ'),
+                    'approved' => $row['approved_at'] !== null,
                     'position_description' => (string) ($row['description'] ?? ''),
                     'requirements' => (string) ($row['requirements'] ?? ''),
                     'benefits' => (string) ($row['benefits'] ?? ''),
@@ -565,7 +648,7 @@ function load_screen_data(string $screen, array $data, array $user): array
 
                 $data['metrics'] = [
                     ['label' => 'Đang mở', 'value' => (string) count(array_filter($positions, static fn($row) => $row['status'] === 'open')), 'note' => 'Vị trí đang nhận hồ sơ'],
-                    ['label' => 'Bản nháp', 'value' => (string) count(array_filter($positions, static fn($row) => $row['status'] === 'draft')), 'note' => 'Chưa hiển thị cho sinh viên'],
+                    ['label' => 'Chờ khoa duyệt', 'value' => (string) count(array_filter($positions, static fn($row) => $row['status'] === 'pending')), 'note' => count(array_filter($positions, static fn($row) => $row['status'] === 'draft')) . ' tin nháp'],
                     ['label' => 'Hồ sơ ứng tuyển', 'value' => (string) array_sum(array_column($positions, 'applicant_count')), 'note' => 'Trên các vị trí của doanh nghiệp'],
                 ];
             } else {
@@ -577,7 +660,7 @@ function load_screen_data(string $screen, array $data, array $user): array
 
                 $data['metrics'] = [
                     ['label' => 'Đang mở', 'value' => (string) count(array_filter($positions, static fn($row) => $row['status'] === 'open')), 'note' => 'Đang nhận hồ sơ'],
-                    ['label' => 'Bản nháp', 'value' => (string) count(array_filter($positions, static fn($row) => $row['status'] === 'draft')), 'note' => 'Chưa công khai'],
+                    ['label' => 'Chờ duyệt', 'value' => (string) count(array_filter($positions, static fn($row) => $row['status'] === 'pending')), 'note' => 'Doanh nghiệp gửi, cần duyệt'],
                     ['label' => 'Tổng vị trí', 'value' => (string) count($positions), 'note' => 'Tất cả doanh nghiệp'],
                 ];
             }
@@ -586,7 +669,7 @@ function load_screen_data(string $screen, array $data, array $user): array
         // Hồ sơ ứng tuyển cần xử lý (hồ sơ đã nhận được chuyển sang mục Thực tập sinh).
         case 'company/applications':
             $allApplications = page_all(
-                'SELECT a.id, s.id AS student_id, a.cv_file, u.full_name, p.title, a.applied_at, a.status FROM applications a JOIN positions p ON p.id = a.position_id JOIN students s ON s.id = a.student_id JOIN users u ON u.id = s.user_id WHERE p.company_id = ? ORDER BY a.applied_at DESC',
+                'SELECT a.id, s.id AS student_id, a.cv_file, u.full_name, p.title, a.applied_at, a.status, a.interview_at, a.interview_place FROM applications a JOIN positions p ON p.id = a.position_id JOIN students s ON s.id = a.student_id JOIN users u ON u.id = s.user_id WHERE p.company_id = ? ORDER BY a.applied_at DESC',
                 [$companyId]
             );
             // Hồ sơ đã nhận chuyển sang mục Thực tập sinh nên không còn nằm trong danh sách xử lý.
@@ -599,6 +682,7 @@ function load_screen_data(string $screen, array $data, array $user): array
             $data['row_ids'] = array_column($applications, 'id');
             $data['row_student_ids'] = array_column($applications, 'student_id');
             $data['row_cv_paths'] = array_column($applications, 'cv_file');
+            $data['row_interviews'] = array_map(static fn($row) => ['at' => $row['interview_at'], 'place' => (string) $row['interview_place'], 'open' => in_array($row['status'], ['pending', 'reviewing'], true)], $applications);
 
             $data['metrics'] = [
                 ['label' => 'Đang trong danh sách', 'value' => (string) count($applications), 'note' => 'Chưa được nhận'],
@@ -609,14 +693,20 @@ function load_screen_data(string $screen, array $data, array $user): array
 
         // Thực tập sinh của doanh nghiệp, kèm kế hoạch do nhà trường giao (chỉ xem).
         case 'company/inters':
-            $internships = page_all('SELECT internship_id, student_id, student_name, position_title, lecturer_name, status FROM v_student_internships WHERE company_id = ? ORDER BY start_date DESC', [$companyId]);
+            $internships = page_all('SELECT v.internship_id, v.student_id, v.student_name, v.position_title, v.lecturer_name, v.status, i.mentor_user_id, mu.full_name AS mentor_name FROM v_student_internships v JOIN internships i ON i.id = v.internship_id LEFT JOIN users mu ON mu.id = i.mentor_user_id WHERE v.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) ORDER BY v.start_date DESC', [$companyId]);
 
-            $data['rows'] = array_map(static fn($row) => [$row['student_name'], $row['position_title'], $row['lecturer_name'] ?: 'Chưa phân công', page_status_label($row['status'], $internshipLabels)], $internships);
+            $data['columns'] = ['Thực tập sinh', 'Vị trí', 'Giảng viên theo dõi', 'Người hướng dẫn tại đơn vị', 'Trạng thái'];
+            $data['rows'] = array_map(static fn($row) => [$row['student_name'], $row['position_title'], $row['lecturer_name'] ?: 'Chưa phân công', $row['mentor_name'] ?: 'Chưa giao', page_status_label($row['status'], $internshipLabels)], $internships);
 
             $data['row_ids'] = array_column($internships, 'internship_id');
+            $data['row_mentor_ids'] = array_map(static fn($row) => (int) $row['mentor_user_id'], $internships);
+            $data['row_status'] = array_column($internships, 'status');
+            // Danh sách người hướng dẫn của doanh nghiệp (chủ tài khoản doanh nghiệp quản lý).
+            $data['mentors'] = page_all('SELECT u.id, u.full_name, u.email, u.phone, u.status, cm.job_title, (SELECT COUNT(*) FROM internships i WHERE i.mentor_user_id = u.id AND i.status IN (\'planned\', \'active\')) AS load_count FROM company_mentors cm JOIN users u ON u.id = cm.user_id WHERE cm.company_id = ? ORDER BY u.full_name', [$companyId]);
             $planRows = page_all('SELECT id, training_plan FROM internships WHERE company_id = ?', [$companyId]);
             $plansById = array_column($planRows, 'training_plan', 'id');
             $data['row_plans'] = array_map(static fn($id) => trim((string) ($plansById[$id] ?? '')), $data['row_ids']);
+            $data['row_weeks'] = page_weekly_plans($data['row_ids']);
 
             $data['metrics'] = [
                 ['label' => 'Đang thực tập', 'value' => (string) count(array_filter($internships, static fn($row) => $row['status'] === 'active')), 'note' => 'Kỳ thực tập hoạt động'],
@@ -627,8 +717,8 @@ function load_screen_data(string $screen, array $data, array $user): array
 
         // Bảng nhiệm vụ doanh nghiệp đã giao, kèm dữ liệu để chỉnh sửa và bộ lọc theo sinh viên.
         case 'company/tasks':
-            $data['internship_options'] = page_all('SELECT i.id, i.student_id, u.full_name, p.title FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN positions p ON p.id = i.position_id WHERE i.company_id = ? AND i.status IN (\'planned\', \'active\') ORDER BY u.full_name', [$companyId]);
-            $tasks = page_all('SELECT t.id, t.title, t.description, t.priority, t.status, t.start_date, t.due_date, t.submission_link, t.submission_file, t.submission_note, t.submitted_at, su.full_name AS student_name FROM tasks t JOIN internships i ON i.id = t.internship_id JOIN students s ON s.id = t.assigned_to JOIN users su ON su.id = s.user_id WHERE i.company_id = ? ORDER BY t.due_date', [$companyId]);
+            $data['internship_options'] = page_all('SELECT i.id, i.student_id, u.full_name, p.title FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN positions p ON p.id = i.position_id WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) AND i.status IN (\'planned\', \'active\') ORDER BY u.full_name', [$companyId]);
+            $tasks = page_all('SELECT t.id, t.title, t.description, t.priority, t.status, t.start_date, t.due_date, t.submission_link, t.submission_file, t.submission_note, t.submitted_at, su.full_name AS student_name FROM tasks t JOIN internships i ON i.id = t.internship_id JOIN students s ON s.id = t.assigned_to JOIN users su ON su.id = s.user_id WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) ORDER BY t.due_date', [$companyId]);
             $data['task_students'] = array_count_values(array_column($tasks, 'student_name'));
             ksort($data['task_students']);
 
@@ -646,9 +736,9 @@ function load_screen_data(string $screen, array $data, array $user): array
 
         // Đánh giá thực tập sinh: mỗi dòng một kỳ thực tập, kèm điểm đã lưu để điều chỉnh.
         case 'company/evaluations':
-            $data['internship_options'] = page_all('SELECT i.id, u.full_name, p.title FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN positions p ON p.id = i.position_id WHERE i.company_id = ? AND i.status IN (\'planned\', \'active\') ORDER BY u.full_name', [$companyId]);
+            $data['internship_options'] = page_all('SELECT i.id, u.full_name, p.title FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN positions p ON p.id = i.position_id WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) AND i.status IN (\'planned\', \'active\') ORDER BY u.full_name', [$companyId]);
             $evaluationRows = page_all(
-                'SELECT i.id, u.full_name, p.title, e.status, e.technical_score, e.attitude_score, e.communication_score, e.discipline_score, e.comments FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN positions p ON p.id = i.position_id LEFT JOIN evaluations e ON e.internship_id = i.id AND e.evaluator_user_id = ? WHERE i.company_id = ? ORDER BY i.end_date',
+                'SELECT i.id, i.batch_id, u.full_name, p.title, e.id AS evaluation_id, e.status, e.offered, e.technical_score, e.attitude_score, e.communication_score, e.discipline_score, e.comments FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN positions p ON p.id = i.position_id LEFT JOIN evaluations e ON e.internship_id = i.id AND e.evaluator_user_id = ? WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) ORDER BY i.end_date',
                 [(int) $user['id'], $companyId]
             );
 
@@ -656,6 +746,7 @@ function load_screen_data(string $screen, array $data, array $user): array
 
             $data['row_ids'] = array_column($evaluationRows, 'id');
             $data['row_evaluations'] = array_map(static fn($row) => $row['status'] === null ? null : $row, $evaluationRows);
+            [$data['row_rubrics'], $data['row_rubric_scores']] = page_evaluation_rubrics($evaluationRows, 'company');
 
             $data['metrics'] = [
                 ['label' => 'Cần đánh giá', 'value' => (string) count(array_filter($evaluationRows, static fn($row) => $row['status'] !== 'submitted')), 'note' => 'Kỳ thực tập đang hoạt động'],
@@ -668,7 +759,7 @@ function load_screen_data(string $screen, array $data, array $user): array
         case 'company/skills':
             $diaries = page_all(
                 'SELECT d.id, d.diary_date, d.content, u.full_name, i.start_date FROM diaries d JOIN internships i ON i.id = d.internship_id JOIN students s ON s.id = d.student_id JOIN users u ON u.id = s.user_id
-                 WHERE i.company_id = ? AND d.status IN (\'submitted\', \'approved\') ORDER BY d.diary_date DESC, d.id DESC LIMIT 100',
+                 WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) AND d.status IN (\'submitted\', \'approved\') ORDER BY d.diary_date DESC, d.id DESC LIMIT 100',
                 [$companyId]
             );
             $diaryIds = array_column($diaries, 'id');
@@ -733,6 +824,8 @@ function load_screen_data(string $screen, array $data, array $user): array
                     ['label' => 'Điện thoại', 'value' => $profile['phone'] ?: $user['phone']],
                     ['label' => 'Địa chỉ', 'value' => $profile['address'] ?: 'Chưa cập nhật'],
                     ['label' => 'Giới thiệu', 'value' => $profile['description'] ?: 'Chưa có giới thiệu.'],
+                    ['label' => 'Lĩnh vực', 'value' => $profile['field'] ?: 'Chưa cập nhật'],
+                    ['label' => 'Hợp tác với trường', 'value' => ['none' => 'Chưa ký biên bản ghi nhớ', 'negotiating' => 'Đang đàm phán biên bản ghi nhớ', 'signed' => 'Đã ký biên bản ghi nhớ', 'expired' => 'Biên bản ghi nhớ đã hết hạn'][$profile['mou_status']] . ($profile['mou_expires'] ? ' · hiệu lực đến ' . page_date($profile['mou_expires']) : '')],
                 ];
             }
             break;
@@ -754,7 +847,11 @@ function load_screen_data(string $screen, array $data, array $user): array
                 ['label' => 'Email', 'value' => $user['email']],
                 ['label' => 'Số điện thoại', 'value' => $user['phone'] ?: 'Chưa cập nhật'],
                 ['label' => 'Bộ môn / Khoa', 'value' => ($profile['department'] ?? '') ?: 'Chưa cập nhật'],
+                ['label' => 'Chuyên môn', 'value' => ($profile['specialization'] ?? '') ?: 'Chưa cập nhật'],
+                ['label' => 'Hướng nghiên cứu', 'value' => ($profile['research_areas'] ?? '') ?: 'Chưa cập nhật'],
+                ['label' => 'Hạn mức hướng dẫn', 'value' => (int) ($profile['max_students'] ?? 0) . ' sinh viên mỗi đợt' . (!empty($profile['is_head']) ? ' · Trưởng bộ môn (duyệt đề tài)' : '')],
             ];
+            $data['profile_record'] = $profile;
             break;
 
         // Hồ sơ quản trị viên.
@@ -837,6 +934,7 @@ function load_screen_data(string $screen, array $data, array $user): array
 
                 $data['row_ids'] = array_column($placements, 'id');
                 $data['row_plans'] = array_map(static fn($row) => trim((string) $row['training_plan']), $placements);
+                $data['row_weeks'] = page_weekly_plans($data['row_ids']);
 
                 $data['metrics'] = [
                     ['label' => 'Sinh viên có kỳ thực tập', 'value' => (string) count($members), 'note' => 'Được phân công cho bạn'],
@@ -874,12 +972,15 @@ function load_screen_data(string $screen, array $data, array $user): array
 
         // Nhật ký của sinh viên mình phụ trách, kèm kết quả AI tóm tắt và ghi chú kỹ năng.
         case 'lecturer/diaries':
-            $diaries = page_all('SELECT d.id, u.full_name, d.title, d.content, d.diary_date, d.status FROM diaries d JOIN internships i ON i.id = d.internship_id JOIN students s ON s.id = d.student_id JOIN users u ON u.id = s.user_id WHERE i.lecturer_id = ? ORDER BY d.diary_date DESC', [$lecturerId]);
+            $diaries = page_all('SELECT d.id, u.full_name, d.title, d.content, d.diary_date, d.status, d.company_status FROM diaries d JOIN internships i ON i.id = d.internship_id JOIN students s ON s.id = d.student_id JOIN users u ON u.id = s.user_id WHERE i.lecturer_id = ? ORDER BY d.diary_date DESC', [$lecturerId]);
 
-            $data['rows'] = array_map(static fn($row) => [$row['full_name'], $row['title'] ?: 'Nhật ký thực tập', page_date($row['diary_date']), page_status_label($row['status'], $diaryLabels)], $diaries);
+            // Tiêu đề kèm kết quả xác nhận của doanh nghiệp (nếu có) để giảng viên duyệt nhanh hơn.
+            $data['rows'] = array_map(static fn($row) => [$row['full_name'], ($row['title'] ?: 'Nhật ký thực tập') . match ($row['company_status']) { 'confirmed' => ' · DN đã xác nhận', 'flagged' => ' · DN có ghi chú', default => '' }, page_date($row['diary_date']), page_status_label($row['status'], $diaryLabels)], $diaries);
 
             $data['row_ids'] = array_column($diaries, 'id');
             $data['row_contents'] = array_column($diaries, 'content');
+            $diaryComments = item_comments('diary', $data['row_ids']);
+            $data['row_comments'] = array_map(static fn($id) => $diaryComments[(int) $id] ?? [], $data['row_ids']);
             $diaryInsights = ai_insight_map('diary', $data['row_ids']);
             $diarySkillRuns = ai_insight_map('diary_skills', $data['row_ids']);
             $data['row_skill_notes'] = array_map(static fn($id) => $diarySkillRuns[(int) $id]['note'] ?? '', $data['row_ids']);
@@ -907,6 +1008,7 @@ function load_screen_data(string $screen, array $data, array $user): array
                 'tag' => page_status_label($row['status'], $reportLabels),
                 'file_path' => $row['file_path'],
             ], $reports);
+            $data['cards'] = page_attach_threads($data['cards']);
 
             $data['metrics'] = [
                 ['label' => 'Cần xem', 'value' => (string) count(array_filter($reports, static fn($row) => in_array($row['status'], ['submitted', 'reviewing'], true))), 'note' => 'Đã nộp báo cáo'],
@@ -918,12 +1020,13 @@ function load_screen_data(string $screen, array $data, array $user): array
         // Đánh giá của giảng viên: mỗi dòng một kỳ thực tập, kèm điểm đã lưu và nhận xét cuối kỳ do AI soạn.
         case 'lecturer/evaluations':
             $data['internship_options'] = page_all('SELECT i.id, u.full_name, p.title FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN positions p ON p.id = i.position_id WHERE i.lecturer_id = ? AND i.status IN (\'planned\', \'active\') ORDER BY u.full_name', [$lecturerId]);
-            $evaluations = page_all('SELECT i.id, u.full_name, c.company_name, e.id AS evaluation_id, e.status, e.technical_score, e.attitude_score, e.communication_score, e.discipline_score, e.comments FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN companies c ON c.id = i.company_id LEFT JOIN evaluations e ON e.internship_id = i.id AND e.evaluator_user_id = ? WHERE i.lecturer_id = ? ORDER BY i.end_date', [(int) $user['id'], $lecturerId]);
+            $evaluations = page_all('SELECT i.id, i.batch_id, u.full_name, c.company_name, e.id AS evaluation_id, e.status, e.technical_score, e.attitude_score, e.communication_score, e.discipline_score, e.comments FROM internships i JOIN students s ON s.id = i.student_id JOIN users u ON u.id = s.user_id JOIN companies c ON c.id = i.company_id LEFT JOIN evaluations e ON e.internship_id = i.id AND e.evaluator_user_id = ? WHERE i.lecturer_id = ? ORDER BY i.end_date', [(int) $user['id'], $lecturerId]);
 
             $data['rows'] = array_map(static fn($row) => [$row['full_name'], $row['company_name'], 'Định kỳ', $row['status'] === 'submitted' ? 'Đã gửi' : 'Cần đánh giá'], $evaluations);
 
             $data['row_ids'] = array_column($evaluations, 'id');
             $data['row_evaluations'] = array_map(static fn($row) => $row['status'] === null ? null : $row, $evaluations);
+            [$data['row_rubrics'], $data['row_rubric_scores']] = page_evaluation_rubrics($evaluations, 'lecturer');
             $finalComments = ai_insight_map('final_comment', $data['row_ids']);
             $data['row_final'] = array_map(static fn($id) => $finalComments[(int) $id] ?? null, $data['row_ids']);
 
@@ -945,9 +1048,9 @@ function load_screen_data(string $screen, array $data, array $user): array
             $activeCompanyCount = page_count('SELECT COUNT(*) FROM companies WHERE status = \'active\'');
 
             $data['metrics'] = [
-                ['label' => 'Sinh viên', 'value' => (string) page_count('SELECT COUNT(*) FROM students'), 'note' => 'Hồ sơ trong hệ thống'],
+                ['label' => 'Sinh viên', 'value' => (string) page_count('SELECT COUNT(*) FROM students'), 'note' => page_count('SELECT COUNT(*) FROM internships WHERE status = \'active\'') . ' đang thực tập'],
+                ['label' => 'Đồ án đang thực hiện', 'value' => (string) page_count('SELECT COUNT(*) FROM theses th JOIN batches b ON b.id = th.batch_id WHERE b.status = \'open\' AND th.status IN (\'assigned\', \'confirmed\', \'in_progress\')'), 'note' => page_count('SELECT COUNT(*) FROM theses WHERE final_score IS NOT NULL') . ' đồ án đã có điểm tổng kết'],
                 ['label' => 'Doanh nghiệp', 'value' => (string) $companyCount, 'note' => (string) max(0, $companyCount - $activeCompanyCount) . ' hồ sơ cần xác minh'],
-                ['label' => 'Kỳ thực tập đang chạy', 'value' => (string) page_count('SELECT COUNT(*) FROM internships WHERE status = \'active\''), 'note' => 'Đang được theo dõi'],
             ];
 
             $data['progress'] = ['label' => 'Doanh nghiệp đã xác minh', 'value' => ($companyCount ? (int) round($activeCompanyCount * 100 / $companyCount) : 0) . '%', 'note' => $activeCompanyCount . '/' . $companyCount . ' doanh nghiệp đã kích hoạt'];
@@ -956,6 +1059,18 @@ function load_screen_data(string $screen, array $data, array $user): array
             $pendingCompanies = page_all('SELECT company_name, created_at FROM companies WHERE status = \'pending\' ORDER BY created_at DESC LIMIT 4');
 
             $data['activities'] = array_map(static fn($row) => ['time' => page_date($row['created_at']), 'title' => $row['company_name'], 'description' => 'Hồ sơ doanh nghiệp đang chờ xác minh.', 'status' => 'Chờ xác minh'], $pendingCompanies);
+
+            // Việc đang chờ phòng đào tạo xử lý ở các phân hệ (đề tài, tin tuyển dụng, khai báo / đổi đơn vị, phúc khảo).
+            foreach ([
+                ['Đề tài chờ duyệt', page_count('SELECT COUNT(*) FROM topics WHERE status IN (\'pending\', \'dept_approved\')'), 'admin/topics'],
+                ['Tin tuyển dụng chờ duyệt', page_count('SELECT COUNT(*) FROM positions WHERE status = \'pending\''), 'admin/positions'],
+                ['Khai báo / đổi đơn vị chờ duyệt', page_count('SELECT COUNT(*) FROM self_placements WHERE status = \'pending\'') + page_count('SELECT COUNT(*) FROM internship_change_requests WHERE status = \'pending\''), 'admin/placements'],
+                ['Phúc khảo chờ xử lý', page_count('SELECT COUNT(*) FROM regrade_requests WHERE status = \'pending\''), 'admin/theses'],
+            ] as [$label, $count, $link]) {
+                if ($count > 0) {
+                    array_unshift($data['activities'], ['time' => 'Cần xử lý', 'title' => $label . ': ' . $count, 'description' => 'Mở mục tương ứng ở thanh bên để xử lý.', 'status' => 'Chờ xử lý']);
+                }
+            }
 
             if (!$data['activities']) {
                 $data['activities'] = [['time' => 'Hệ thống', 'title' => 'Không có hồ sơ chờ xác minh', 'description' => 'Các đăng ký mới sẽ xuất hiện ở đây.', 'status' => 'Đã cập nhật']];
@@ -966,7 +1081,7 @@ function load_screen_data(string $screen, array $data, array $user): array
         case 'admin/students':
         case 'admin/users':
             $accounts = page_all(
-                'SELECT u.id, u.full_name, u.email, u.role, u.status, s.student_code, s.major FROM users u LEFT JOIN students s ON s.user_id = u.id ORDER BY u.role, u.full_name'
+                'SELECT u.id, u.full_name, u.email, u.role, u.status, s.student_code, s.major FROM users u LEFT JOIN students s ON s.user_id = u.id LEFT JOIN lecturers l ON l.user_id = u.id WHERE @it_faculty IS NULL OR s.faculty = @it_faculty OR l.faculty = @it_faculty ORDER BY u.role, u.full_name'
             );
             $roleLabels = ['student' => 'Sinh viên', 'company' => 'Doanh nghiệp', 'lecturer' => 'Giảng viên', 'admin' => 'Quản trị'];
 
@@ -979,9 +1094,11 @@ function load_screen_data(string $screen, array $data, array $user): array
                 $groupLabels = ['student' => 'Sinh viên', 'lecturer' => 'Giảng viên', 'company' => 'Doanh nghiệp', 'admin' => 'Quản trị'];
                 $group = isset($_GET['group']) && is_string($_GET['group']) && isset($groupLabels[$_GET['group']]) ? $_GET['group'] : 'student';
                 $accounts = page_all(
-                    'SELECT u.id, u.full_name, u.username, u.email, u.phone, u.role, u.status, s.student_code, s.major, s.class_name,
-                            l.lecturer_code, l.department, c.company_code, c.company_name
+                    'SELECT u.id, u.full_name, u.username, u.email, u.phone, u.role, u.status, u.scope_faculty, s.student_code, s.major, s.class_name,
+                            l.lecturer_code, l.department, l.faculty AS lecturer_faculty, c.company_code, c.company_name,
+                            (SELECT GROUP_CONCAT(ur.role) FROM user_roles ur WHERE ur.user_id = u.id) AS extra_roles
                      FROM users u LEFT JOIN students s ON s.user_id = u.id LEFT JOIN lecturers l ON l.user_id = u.id LEFT JOIN companies c ON c.user_id = u.id
+                     WHERE @it_faculty IS NULL OR s.faculty = @it_faculty OR l.faculty = @it_faculty
                      ORDER BY u.full_name'
                 );
                 $groupCounts = array_fill_keys(array_keys($groupLabels), 0);
@@ -1009,6 +1126,10 @@ function load_screen_data(string $screen, array $data, array $user): array
                     default => [$row['full_name'], $row['email'], $row['username'], $row['phone'] ?: $none, $stateText($row)],
                 }, $accounts);
                 $data['row_active'] = array_map(static fn($row) => $row['status'] === 'active', $accounts);
+                // Phân quyền (giảng viên / quản trị): vai trò bổ sung, phạm vi khoa của quản trị, khoa của giảng viên.
+                $data['row_access'] = array_map(static fn($row) => ['role' => $row['role'], 'extra' => array_filter(explode(',', (string) $row['extra_roles'])), 'scope' => (string) $row['scope_faculty'], 'faculty' => (string) $row['lecturer_faculty']], $accounts);
+                $data['faculties'] = array_values(array_unique(array_filter(array_merge(array_column(page_all('SELECT DISTINCT faculty FROM majors WHERE faculty IS NOT NULL'), 'faculty'), array_column(page_all('SELECT DISTINCT faculty FROM students WHERE faculty IS NOT NULL AND faculty <> \'\''), 'faculty')))));
+                sort($data['faculties']);
                 $activeAccounts = count(array_filter($accounts, static fn($row) => $row['status'] === 'active'));
 
                 $data['title'] = 'Tài khoản ' . mb_strtolower($groupLabels[$group], 'UTF-8');
@@ -1051,13 +1172,16 @@ function load_screen_data(string $screen, array $data, array $user): array
 
         // Danh sách doanh nghiệp và trạng thái xác minh.
         case 'admin/companies':
-            $companies = page_all('SELECT c.id, c.company_name, c.company_code, c.status, COUNT(p.id) AS positions FROM companies c LEFT JOIN positions p ON p.company_id = c.id GROUP BY c.id ORDER BY c.company_name');
+            $companies = page_all('SELECT c.id, c.company_name, c.company_code, c.status, c.mou_status, c.mou_expires, c.field, COUNT(p.id) AS positions FROM companies c LEFT JOIN positions p ON p.company_id = c.id GROUP BY c.id ORDER BY c.company_name');
             $companyLabels = ['pending' => 'Chờ xác minh', 'active' => 'Hoạt động', 'inactive' => 'Tạm ngưng', 'rejected' => 'Từ chối'];
 
             $data['rows'] = array_map(static fn($row) => [$row['company_name'], $row['company_code'], (string) $row['positions'], page_status_label($row['status'], $companyLabels)], $companies);
 
             $data['row_ids'] = array_column($companies, 'id');
             $data['row_status'] = array_column($companies, 'status');
+            $data['row_mou'] = array_column($companies, 'mou_status');
+            $data['row_mou_expires'] = array_column($companies, 'mou_expires');
+            $data['row_fields'] = array_column($companies, 'field');
 
             $data['metrics'] = [
                 ['label' => 'Hoạt động', 'value' => (string) count(array_filter($companies, static fn($row) => $row['status'] === 'active')), 'note' => 'Doanh nghiệp đã xác minh'],
@@ -1070,7 +1194,7 @@ function load_screen_data(string $screen, array $data, array $user): array
         case 'admin/internship':
             $data['lecturer_options'] = page_all('SELECT l.id, l.lecturer_code, u.full_name FROM lecturers l JOIN users u ON u.id = l.user_id ORDER BY u.full_name');
             // Mọi tài khoản sinh viên đều có mặt trong danh sách; sinh viên chưa có kỳ thực tập hiện một dòng riêng, có kỳ thì mỗi kỳ một dòng.
-            $internships = page_all('SELECT i.id, i.lecturer_id, u.full_name, s.major, p.title, lu.full_name AS lecturer_name, i.status, i.training_plan, i.final_score, i.start_date, i.end_date, i.description FROM users u LEFT JOIN students s ON s.user_id = u.id LEFT JOIN internships i ON i.student_id = s.id LEFT JOIN positions p ON p.id = i.position_id LEFT JOIN lecturers l ON l.id = i.lecturer_id LEFT JOIN users lu ON lu.id = l.user_id WHERE u.role = \'student\' ORDER BY u.full_name, i.start_date DESC');
+            $internships = page_all('SELECT i.id, i.lecturer_id, u.full_name, s.major, p.title, lu.full_name AS lecturer_name, i.status, i.training_plan, i.final_score, i.start_date, i.end_date, i.description FROM users u LEFT JOIN students s ON s.user_id = u.id LEFT JOIN internships i ON i.student_id = s.id LEFT JOIN positions p ON p.id = i.position_id LEFT JOIN lecturers l ON l.id = i.lecturer_id LEFT JOIN users lu ON lu.id = l.user_id WHERE u.role = \'student\' AND (@it_faculty IS NULL OR s.faculty = @it_faculty) ORDER BY u.full_name, i.start_date DESC');
 
             $data['rows'] = array_map(static fn($row) => $row['id'] === null
                 ? [$row['full_name'], trim((string) $row['major']) ?: 'Chưa cập nhật', 'Chưa có kỳ thực tập', '—', 'Chưa thực tập']
@@ -1125,8 +1249,10 @@ function load_screen_data(string $screen, array $data, array $user): array
             $data = array_merge($data, message_screen_data($user));
             break;
 
-        // Màn hình không cần dữ liệu động: giữ nguyên cấu hình mẫu trong page-data.php.
+        // Phân hệ mở rộng: đồ án, đợt, ghép cặp, rubric (ThesisController) và thông báo, lịch, thống kê, nhật ký (AdminToolsController).
+        // Màn hình không thuộc phân hệ nào giữ nguyên cấu hình mẫu trong page-data.php.
         default:
+            $data = thesis_screen_data($screen, $data, $user) ?? admin_tools_screen_data($screen, $data, $user) ?? $data;
             break;
     }
 

@@ -56,7 +56,13 @@ if (!function_exists('screen_escape')) {
 // Nạp dữ liệu thật từ database cho màn hình (xem load_screen_data trong PageController.php).
 require_once __DIR__ . '/../../controllers/PageController.php';
 $user ??= authenticated_user();
+// Nhắc hạn nộp, lịch gặp, cảnh báo nhật ký: chạy tối đa một lần mỗi ngày (xem AdminToolsController.php).
+reminders_run_daily();
 $screenData = load_screen_data($screen, $screenData, $user);
+// Dải thông tin đợt thực tập (mốc đang mở / đã hết hạn) trên các trang thực tập của sinh viên.
+$batchNotice = $user['role'] === 'student' && in_array($screen, ['student/internships', 'student/applications', 'student/placement', 'student/reports', 'student/diary', 'student/evaluation'], true)
+    ? internship_batch_notice((int) $user['student_id'])
+    : null;
 
 // Thông báo: số chưa đọc theo từng mục (menu bên), tổng (chuông) và các thông báo của mục đang mở.
 require_once __DIR__ . '/../../controllers/NotificationController.php';
@@ -68,6 +74,7 @@ $sectionNotices = ($sectionKey !== '' && ($notificationCounts[$sectionKey] ?? 0)
 
 // Ghép trang theo thứ tự: header (khung + sidebar) → content (thân trang) → footer.
 require_once __DIR__ . '/ai-insight.php';
+require_once __DIR__ . '/comments.php';
 require __DIR__ . '/header.php';
 require __DIR__ . '/content.php';
 require __DIR__ . '/footer.php';

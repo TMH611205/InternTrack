@@ -31,18 +31,24 @@ function message_contacts(array $user): array
                  WHERE i.student_id = ? AND i.status <> \'cancelled\' GROUP BY lu.id, lu.full_name',
                 [$studentId],
             ],
+            [
+                'SELECT mu.id AS user_id, mu.full_name AS name, \'company\' AS role, CONCAT(\'Người hướng dẫn · \', c.company_name) AS context
+                 FROM internships i JOIN users mu ON mu.id = i.mentor_user_id AND mu.status = \'active\' JOIN companies c ON c.id = i.company_id
+                 WHERE i.student_id = ? AND i.status <> \'cancelled\' GROUP BY mu.id, mu.full_name, c.company_name',
+                [$studentId],
+            ],
         ],
         'company' => [
             [
                 'SELECT su.id AS user_id, su.full_name AS name, \'student\' AS role, GROUP_CONCAT(DISTINCT p.title ORDER BY p.title SEPARATOR \', \') AS context
                  FROM internships i JOIN students s ON s.id = i.student_id JOIN users su ON su.id = s.user_id AND su.status = \'active\' JOIN positions p ON p.id = i.position_id
-                 WHERE i.company_id = ? AND i.status <> \'cancelled\' GROUP BY su.id, su.full_name',
+                 WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) AND i.status <> \'cancelled\' GROUP BY su.id, su.full_name',
                 [$companyId],
             ],
             [
                 'SELECT lu.id AS user_id, lu.full_name AS name, \'lecturer\' AS role, CONCAT(\'Phụ trách: \', GROUP_CONCAT(DISTINCT su.full_name ORDER BY su.full_name SEPARATOR \', \')) AS context
                  FROM internships i JOIN lecturers l ON l.id = i.lecturer_id JOIN users lu ON lu.id = l.user_id AND lu.status = \'active\' JOIN students s ON s.id = i.student_id JOIN users su ON su.id = s.user_id
-                 WHERE i.company_id = ? AND i.status <> \'cancelled\' GROUP BY lu.id, lu.full_name',
+                 WHERE i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor) AND i.status <> \'cancelled\' GROUP BY lu.id, lu.full_name',
                 [$companyId],
             ],
         ],
@@ -57,6 +63,12 @@ function message_contacts(array $user): array
                 'SELECT cu.id AS user_id, c.company_name AS name, \'company\' AS role, CONCAT(\'Sinh viên: \', GROUP_CONCAT(DISTINCT su.full_name ORDER BY su.full_name SEPARATOR \', \')) AS context
                  FROM internships i JOIN companies c ON c.id = i.company_id JOIN users cu ON cu.id = c.user_id AND cu.status = \'active\' JOIN students s ON s.id = i.student_id JOIN users su ON su.id = s.user_id
                  WHERE i.lecturer_id = ? AND i.status <> \'cancelled\' GROUP BY cu.id, c.company_name',
+                [$lecturerId],
+            ],
+            [
+                'SELECT mu.id AS user_id, mu.full_name AS name, \'company\' AS role, CONCAT(\'Người hướng dẫn · \', c.company_name) AS context
+                 FROM internships i JOIN users mu ON mu.id = i.mentor_user_id AND mu.status = \'active\' JOIN companies c ON c.id = i.company_id
+                 WHERE i.lecturer_id = ? AND i.status <> \'cancelled\' GROUP BY mu.id, mu.full_name, c.company_name',
                 [$lecturerId],
             ],
         ],

@@ -671,3 +671,116 @@
   };
   setInterval(refresh, 6000);
 })();
+// Lọc thẻ theo từ khóa: ô [data-card-search="<id danh sách>"] ẩn các thẻ [data-card-text] không chứa từ khóa.
+document.querySelectorAll("[data-card-search]").forEach((input) => {
+  const list = document.getElementById(input.dataset.cardSearch);
+  if (!list) return;
+  input.addEventListener("input", () => {
+    const keyword = input.value.trim().toLowerCase();
+    list.querySelectorAll("[data-card-text]").forEach((card) => {
+      card.hidden = keyword !== "" && !card.dataset.cardText.includes(keyword);
+    });
+  });
+});
+// Menu tài khoản ở thanh trên: mở khi rê chuột (CSS) hoặc khi bấm (điện thoại); bấm ra ngoài hoặc Escape để đóng.
+document.querySelectorAll("[data-user-menu]").forEach((menu) => {
+  const toggle = menu.querySelector("[data-user-menu-toggle]");
+  const setOpen = (open) => {
+    menu.classList.toggle("is-open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  toggle.addEventListener("click", () =>
+    setOpen(!menu.classList.contains("is-open")),
+  );
+  document.addEventListener("click", (event) => {
+    if (!menu.contains(event.target)) setOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setOpen(false);
+  });
+});
+
+// Giao diện sáng / tối: mặc định theo hệ điều hành, lựa chọn của người dùng lưu trong trình duyệt.
+(() => {
+  const root = document.documentElement;
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)");
+  const current = () =>
+    root.dataset.theme || (prefersDark.matches ? "dark" : "light");
+  const refreshLabels = () => {
+    document.querySelectorAll("[data-theme-label]").forEach((label) => {
+      label.textContent =
+        current() === "dark" ? "Giao diện sáng" : "Giao diện tối";
+    });
+  };
+  document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const next = current() === "dark" ? "light" : "dark";
+      root.dataset.theme = next;
+      try {
+        localStorage.setItem("theme", next);
+      } catch (error) {
+        // Trình duyệt chặn lưu trữ: chỉ đổi trong lần xem này.
+      }
+      refreshLabels();
+    });
+  });
+  prefersDark.addEventListener("change", refreshLabels);
+  refreshLabels();
+})();
+
+// Form đợt: chỉ hiện phần cấu hình của loại đợt đang chọn (đồ án / thực tập).
+document.querySelectorAll('select[name="batch_type"]').forEach((select) => {
+  const form = select.closest("form");
+  const sync = () => {
+    form.querySelectorAll("[data-batch-only]").forEach((part) => {
+      part.hidden = part.dataset.batchOnly !== select.value;
+    });
+  };
+  select.addEventListener("change", sync);
+  sync();
+});
+
+// Ghép cặp: kéo thẻ sinh viên sang cột đề tài khác để sửa kết quả chạy thử (gửi form matching_run_edit).
+document.querySelectorAll("[data-match-board-form]").forEach((form) => {
+  const board = form.parentElement;
+  let dragged = null;
+  board.querySelectorAll("[data-match-key]").forEach((card) => {
+    card.addEventListener("dragstart", (event) => {
+      dragged = card.dataset.matchKey;
+      event.dataTransfer.effectAllowed = "move";
+      card.classList.add("is-dragging");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("is-dragging"));
+  });
+  board.querySelectorAll("[data-match-column]").forEach((column) => {
+    column.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      column.classList.add("is-over");
+    });
+    column.addEventListener("dragleave", () => column.classList.remove("is-over"));
+    column.addEventListener("drop", (event) => {
+      event.preventDefault();
+      column.classList.remove("is-over");
+      if (!dragged) return;
+      form.elements.key.value = dragged;
+      form.elements.topic_id.value = column.dataset.matchColumn;
+      form.submit();
+    });
+  });
+});
+
+// AI gợi ý đề tài: "Dùng đề tài này" điền vào form đăng ký (hộp thoại) hoặc form đề xuất của sinh viên.
+document.querySelectorAll("[data-ai-topic-use]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const target = document.getElementById(button.dataset.aiTopicUse);
+    if (!target) return;
+    const form = target.tagName === "FORM" ? target : target.querySelector("form");
+    const topic = JSON.parse(button.dataset.topic || "{}");
+    ["title", "description", "objectives", "technologies", "field"].forEach((name) => {
+      if (form.elements[name] && topic[name]) form.elements[name].value = topic[name];
+    });
+    button.closest("dialog")?.close();
+    if (target.tagName === "DIALOG") target.showModal();
+    else form.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+});

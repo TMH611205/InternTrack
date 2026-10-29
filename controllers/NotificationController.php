@@ -7,10 +7,14 @@ require_once __DIR__ . '/../config/database.php';
 // Thông báo được gắn với một "mục" (section) trùng khóa menu của vai trò, ví dụ applications, tasks, diaries.
 // Số chưa đọc theo mục hiện ở menu bên; tổng số chưa đọc hiện ở chuông phía trên.
 
-function notify_user(int $userId, string $section, string $title, string $message = '', ?string $route = null): void
+// $email = true: gửi kèm email (chỉ khi bật MAIL_NOTIFY=1 và đã cấu hình SMTP), dùng cho sự kiện quan trọng như nhắc hạn, kết quả ghép, điểm mới.
+function notify_user(int $userId, string $section, string $title, string $message = '', ?string $route = null, bool $email = false): void
 {
     if ($userId <= 0) {
         return;
+    }
+    if ($email) {
+        notify_email($userId, $title, $message);
     }
     try {
         database()->prepare('INSERT INTO notifications (user_id, section, title, message, link) VALUES (?, ?, ?, ?, ?)')->execute([
@@ -26,7 +30,7 @@ function notify_user(int $userId, string $section, string $title, string $messag
     }
 }
 
-function notify_by_profile(string $table, int $profileId, string $section, string $title, string $message, ?string $route): void
+function notify_by_profile(string $table, int $profileId, string $section, string $title, string $message, ?string $route, bool $email = false): void
 {
     if (!in_array($table, ['students', 'companies', 'lecturers'], true) || $profileId <= 0) {
         return;
@@ -35,23 +39,43 @@ function notify_by_profile(string $table, int $profileId, string $section, strin
     $statement->execute([$profileId]);
     $userId = $statement->fetchColumn();
     if ($userId) {
-        notify_user((int) $userId, $section, $title, $message, $route);
+        notify_user((int) $userId, $section, $title, $message, $route, $email);
     }
 }
 
-function notify_student(int $studentId, string $section, string $title, string $message = '', ?string $route = null): void
+// Gửi email thông báo; lỗi gửi chỉ ghi log, không làm hỏng thao tác chính.
+function notify_email(int $userId, string $title, string $message): void
 {
-    notify_by_profile('students', $studentId, $section, $title, $message, $route);
+    if ((string) app_env('MAIL_NOTIFY', '0') !== '1') {
+        return;
+    }
+    $statement = database()->prepare('SELECT email, full_name FROM users WHERE id = ? AND status = \'active\'');
+    $statement->execute([$userId]);
+    $recipient = $statement->fetch();
+    if ($recipient) {
+        app_send_mail((string) $recipient['email'], $title, 'Xin chào ' . $recipient['full_name'] . ",
+
+" . $title . ($message !== '' ? "
+" . $message : '') . "
+
+Đăng nhập hệ thống Thực tập & Đồ án - Trường Đại học Vinh để xem chi tiết.
+");
+    }
 }
 
-function notify_company(int $companyId, string $section, string $title, string $message = '', ?string $route = null): void
+function notify_student(int $studentId, string $section, string $title, string $message = '', ?string $route = null, bool $email = false): void
 {
-    notify_by_profile('companies', $companyId, $section, $title, $message, $route);
+    notify_by_profile('students', $studentId, $section, $title, $message, $route, $email);
 }
 
-function notify_lecturer(int $lecturerId, string $section, string $title, string $message = '', ?string $route = null): void
+function notify_company(int $companyId, string $section, string $title, string $message = '', ?string $route = null, bool $email = false): void
 {
-    notify_by_profile('lecturers', $lecturerId, $section, $title, $message, $route);
+    notify_by_profile('companies', $companyId, $section, $title, $message, $route, $email);
+}
+
+function notify_lecturer(int $lecturerId, string $section, string $title, string $message = '', ?string $route = null, bool $email = false): void
+{
+    notify_by_profile('lecturers', $lecturerId, $section, $title, $message, $route, $email);
 }
 
 // Số thông báo chưa đọc theo từng mục: ['applications' => 2, 'tasks' => 1].

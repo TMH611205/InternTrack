@@ -4,6 +4,20 @@ declare(strict_types=1);
 
 const APP_NAME = 'InternTrack';
 const APP_CHARSET = 'UTF-8';
+const SCHOOL_FACULTY = 'Trường Kỹ thuật và Công nghệ';
+const SCHOOL_DEPARTMENTS = ['Khoa Công nghệ thông tin', 'Khoa Khoa học máy tính và Trí tuệ nhân tạo', 'Khoa Công nghệ Kỹ thuật điện', 'Khoa Công nghệ Kỹ thuật ô tô', 'Khoa Điện tử và Công nghệ bán dẫn', 'Khoa Tự động hóa'];
+// shortcut: chưa có văn bản công khai về mã giảng viên, tạm dùng GV + 6 chữ số; sửa tại đây khi có quy định của trường.
+const LECTURER_CODE_PATTERN = '/^GV\d{6}$/';
+
+// Tách mã sinh viên 15 chữ số, ví dụ 235748020110017: 23 (năm nhập học) · 5 · 7480201 (mã ngành) · 1 · 0017. Khóa = năm nhập học - 1959 (2023 là K64).
+function student_code_info(string $code): ?array
+{
+    if (preg_match('/^(\d{2})\d(\d{7})\d\d{4}$/', $code, $match) !== 1 || 2000 + (int) $match[1] > (int) date('Y')) {
+        return null;
+    }
+    $year = 2000 + (int) $match[1];
+    return ['year' => $year, 'cohort' => $year - 1959, 'major_code' => $match[2]];
+}
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 

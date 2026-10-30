@@ -12,6 +12,7 @@ InternTrack is a Vietnamese-language internship and graduation-thesis management
 - Run: start Apache + MySQL in XAMPP, open `http://localhost/InternTrack/`
 - DB setup: create DB `interntrack` (utf8mb4_unicode_ci), import `database/interntrack.sql` (idempotent `CREATE TABLE IF NOT EXISTS`), then optionally `database/seed.sql` (local demo accounts only).
 - Upgrade an existing DB: `C:\xampp\php\php.exe scripts\migrate.php` (adds missing tables / columns / ENUM values from `interntrack.sql`; idempotent; `--database=<name>` targets a copy). When you change the schema, edit `database/interntrack.sql` only; the migrator derives ALTERs from it.
+- Normalize old data to the school's majors and code formats (after migrate): `C:\xampp\php\php.exe scripts\normalize_school.php`.
 - Scheduled jobs: `scripts/cron.php` (hourly) runs daily reminders and a daily backup into `backups/` (git-ignored, web-blocked).
 - Syntax check a file: `C:\xampp\php\php.exe -l <file>`
 - Config comes from env vars or a single git-ignored `.env` (there is no `.env.example`; the variable list is in `README.md`): `DB_*`, `MAIL_*`, `GEMINI_API_KEY`/`GEMINI_MODEL`. Never commit `.env` or put secrets anywhere tracked. Read via `app_env()` in `config/app.php`.
@@ -43,6 +44,8 @@ Single front controller: everything goes through `index.php`.
 - Demo data for the thesis module: `database/seed-thesis.sql`. `notify_user(..., $email = true)` also emails when `MAIL_NOTIFY=1`.
 - `config/app.php` installs a global error handler that converts PHP warnings/notices into `ErrorException`, so sloppy code throws.
 - Uploads: `store_uploaded_file()` validates real MIME and size (CV/report up to 5 MB, avatars 3 MB) into `uploads/<folder>/`.
+
+- **School scope / codes**: only majors of Trường Kỹ thuật và Công nghệ (`majors` catalog in `interntrack.sql`). Student code = 15 digits `YY d MMMMMMM d NNNN` parsed by `student_code_info()` (`config/app.php`; cohort K = year − 1959), and `student_code_major()` derives major/faculty from it on create and import. Lecturer format is `LECTURER_CODE_PATTERN` (provisional, no published school rule).
 
 ## Conventions
 

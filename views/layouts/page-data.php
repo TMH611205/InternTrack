@@ -135,8 +135,8 @@ return [
         'kind' => 'profile',
         'eyebrow' => 'Hồ sơ cá nhân',
         'title' => 'Minh Anh Nguyễn',
-        'description' => 'Sinh viên Thiết kế trải nghiệm người dùng · Đại học Kiến trúc TP. Hồ Chí Minh',
-        'fields' => [['label' => 'Mã sinh viên', 'value' => 'UX22-0418'], ['label' => 'Email', 'value' => 'minhanh.nguyen@sv.uah.edu.vn'], ['label' => 'Lớp / Khoa', 'value' => 'UXD22A · Khoa Mỹ thuật công nghiệp'], ['label' => 'Số điện thoại', 'value' => '+84 903 248 681'], ['label' => 'Địa chỉ', 'value' => 'Quận Bình Thạnh, TP. Hồ Chí Minh'], ['label' => 'Giới thiệu', 'value' => 'Mình quan tâm đến những sản phẩm số dễ hiểu, có ích và tôn trọng thời gian của người dùng.']],
+        'description' => 'Sinh viên Công nghệ thông tin · Trường Đại học Vinh',
+        'fields' => [['label' => 'Mã sinh viên', 'value' => '225748020110418'], ['label' => 'Email', 'value' => 'minhanh.nguyen@sv.uah.edu.vn'], ['label' => 'Lớp / Khoa', 'value' => '63K-CNTT1 · Trường Kỹ thuật và Công nghệ'], ['label' => 'Số điện thoại', 'value' => '+84 903 248 681'], ['label' => 'Địa chỉ', 'value' => 'Quận Bình Thạnh, TP. Hồ Chí Minh'], ['label' => 'Giới thiệu', 'value' => 'Mình quan tâm đến những sản phẩm số dễ hiểu, có ích và tôn trọng thời gian của người dùng.']],
     ],
 
     // [Sinh viên] Báo cáo thực tập.
@@ -395,7 +395,7 @@ return [
         'description' => 'Giám sát kỳ thực tập, tình trạng phân công giảng viên và các mốc quan trọng.',
         'metrics' => [['label' => 'Đang diễn ra', 'value' => '412', 'note' => '64 doanh nghiệp'], ['label' => 'Sắp bắt đầu', 'value' => '128', 'note' => 'Trong 30 ngày tới'], ['label' => 'Cần phân công', 'value' => '09', 'note' => 'Chưa có giảng viên']],
         'columns' => ['Sinh viên', 'Ngành', 'Vị trí', 'Giảng viên', 'Trạng thái'],
-        'rows' => [['Minh Anh Nguyễn', 'Thiết kế', 'Product Design Intern', 'Nguyễn Hà', 'Đang diễn ra'], ['Quang Minh', 'Công nghệ thông tin', 'Frontend Intern', 'Trần Duy', 'Đang diễn ra'], ['Thảo Nguyên', 'Truyền thông', 'Content Intern', 'Chưa phân công', 'Sắp bắt đầu'], ['Gia Hân', 'Thiết kế', 'UX Research Intern', 'Lê Phương', 'Đang diễn ra']],
+        'rows' => [['Minh Anh Nguyễn', 'Công nghệ thông tin', 'Product Design Intern', 'Nguyễn Hà', 'Đang diễn ra'], ['Quang Minh', 'Kỹ thuật phần mềm', 'Frontend Intern', 'Trần Duy', 'Đang diễn ra'], ['Thảo Nguyên', 'Công nghệ kỹ thuật điện tử - viễn thông', 'Content Intern', 'Chưa phân công', 'Sắp bắt đầu'], ['Gia Hân', 'Công nghệ thông tin', 'UX Research Intern', 'Lê Phương', 'Đang diễn ra']],
     ],
 
     // [Quản trị] Vị trí thực tập của mọi doanh nghiệp.
@@ -421,7 +421,7 @@ return [
         'description' => 'Quản lý tài khoản, tình trạng học tập và thông tin thực tập trên toàn trường.',
         'metrics' => [['label' => 'Tài khoản hoạt động', 'value' => '1,248', 'note' => 'Tăng 134 trong năm nay'], ['label' => 'Đang thực tập', 'value' => '412', 'note' => '33% tổng số sinh viên'], ['label' => 'Chưa có nơi thực tập', 'value' => '57', 'note' => 'Cần hỗ trợ kết nối']],
         'columns' => ['Sinh viên', 'Mã sinh viên', 'Ngành học', 'Trạng thái'],
-        'rows' => [['Minh Anh Nguyễn', 'UX22-0418', 'Thiết kế UX', 'Đang thực tập'], ['Quang Minh', 'FE22-0132', 'Kỹ thuật phần mềm', 'Đang thực tập'], ['Thảo Nguyên', 'CT22-0079', 'Truyền thông số', 'Đang thực tập'], ['Gia Hân', 'UX22-0431', 'Thiết kế UX', 'Chờ thực tập']],
+        'rows' => [['Minh Anh Nguyễn', '225748020110418', 'Công nghệ thông tin', 'Đang thực tập'], ['Quang Minh', '225748010310132', 'Kỹ thuật phần mềm', 'Đang thực tập'], ['Thảo Nguyên', '225751030210079', 'Công nghệ kỹ thuật điện tử - viễn thông', 'Đang thực tập'], ['Gia Hân', '225748020110431', 'Công nghệ thông tin', 'Chờ thực tập']],
     ],
 
     // [Quản trị] Tài liệu của khoa cho trợ lý hỏi đáp.

@@ -16,18 +16,12 @@ INSERT INTO academic_terms (name, school_year, semester, start_date, end_date, i
 ('Học kỳ 2 · 2026-2027', '2026-2027', 2, '2027-01-18', '2027-06-20', 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
-INSERT INTO majors (code, name, faculty) VALUES
-('7480201', 'Kỹ thuật phần mềm', 'Viện Kỹ thuật và Công nghệ'),
-('7210403', 'Thiết kế trải nghiệm người dùng', 'Khoa Mỹ thuật công nghiệp'),
-('7320104', 'Truyền thông số', 'Khoa Truyền thông')
-ON DUPLICATE KEY UPDATE name = VALUES(name), faculty = VALUES(faculty);
-
 -- Thông tin học tập (đồng bộ từ phòng đào tạo) và kỹ năng của sinh viên mẫu.
 UPDATE students s JOIN users u ON u.id = s.user_id SET s.gpa = 3.42, s.credits = 128, s.training_system = 'Chính quy', s.skills = 'Figma, nghiên cứu người dùng, HTML, CSS, JavaScript', s.interests = 'Thiết kế sản phẩm, UX' WHERE u.username = 'student';
 UPDATE students s JOIN users u ON u.id = s.user_id SET s.gpa = 3.05, s.credits = 124, s.training_system = 'Chính quy', s.skills = 'Figma, kiểm thử usability, tiếng Anh', s.interests = 'UX research' WHERE u.username = 'han';
 UPDATE students s JOIN users u ON u.id = s.user_id SET s.gpa = 3.61, s.credits = 131, s.training_system = 'Chính quy', s.skills = 'PHP, Laravel, MySQL, React, Git', s.interests = 'Phát triển web, hệ thống thông tin' WHERE u.username = 'bao';
 UPDATE students s JOIN users u ON u.id = s.user_id SET s.gpa = 2.88, s.credits = 126, s.training_system = 'Chính quy', s.skills = 'Figma, prototyping, React', s.interests = 'Thiết kế giao diện' WHERE u.username = 'vy';
-UPDATE students s JOIN users u ON u.id = s.user_id SET s.gpa = 3.20, s.credits = 129, s.training_system = 'Chính quy', s.skills = 'Viết nội dung, SEO, phân tích dữ liệu', s.interests = 'Truyền thông số, dữ liệu' WHERE u.username = 'thao';
+UPDATE students s JOIN users u ON u.id = s.user_id SET s.gpa = 3.20, s.credits = 129, s.training_system = 'Chính quy', s.skills = 'Vi điều khiển, xử lý tín hiệu, phân tích dữ liệu', s.interests = 'Viễn thông, dữ liệu' WHERE u.username = 'thao';
 
 UPDATE lecturers l JOIN users u ON u.id = l.user_id SET l.research_areas = 'Thiết kế trải nghiệm người dùng, tương tác người - máy, nghiên cứu người dùng', l.max_students = 6, l.is_head = 1, l.specialization = 'Tương tác người - máy' WHERE u.username = 'lecturer';
 UPDATE lecturers l JOIN users u ON u.id = l.user_id SET l.research_areas = 'Phát triển web, cơ sở dữ liệu, kiến trúc phần mềm, học máy', l.max_students = 6, l.specialization = 'Kỹ thuật phần mềm' WHERE u.username = 'lecturer2';
@@ -108,7 +102,7 @@ JOIN (
     UNION ALL SELECT 'lecturer', 'Nghiên cứu khả năng tiếp cận (accessibility) của cổng thông tin sinh viên', 'Đánh giá theo WCAG 2.2 và đề xuất cải tiến.', 'Bộ tiêu chí và báo cáo đánh giá.', 'HTML, CSS, kiểm thử usability', 'WCAG, axe', 'Thiết kế trải nghiệm', 1, 'approved'
     UNION ALL SELECT 'lecturer2', 'Xây dựng hệ thống quản lý thực tập và đồ án bằng PHP', 'Phân tích, thiết kế và cài đặt hệ thống web cho khoa.', 'Hệ thống chạy được với đủ vai trò.', 'PHP, MySQL, Git', 'PHP, MySQL, JavaScript', 'Phát triển web', 2, 'approved'
     UNION ALL SELECT 'lecturer2', 'Ứng dụng React hiển thị thời khóa biểu và lịch thi', 'Ứng dụng web đọc dữ liệu thời khóa biểu và nhắc lịch.', 'Ứng dụng responsive, có thông báo.', 'React, REST API', 'React, Node.js', 'Phát triển web', 1, 'approved'
-    UNION ALL SELECT 'lecturer2', 'Phân tích dữ liệu tương tác mạng xã hội của các khoa', 'Thu thập và phân tích chỉ số tương tác, đề xuất chiến lược nội dung.', 'Dashboard và báo cáo.', 'Phân tích dữ liệu, SEO', 'Python, Power BI', 'Truyền thông số', 1, 'approved'
+    UNION ALL SELECT 'lecturer2', 'Phân tích dữ liệu tương tác mạng xã hội của các khoa', 'Thu thập và phân tích chỉ số tương tác, đề xuất chiến lược nội dung.', 'Dashboard và báo cáo.', 'Phân tích dữ liệu, SEO', 'Python, Power BI', 'Phân tích dữ liệu', 1, 'approved'
     UNION ALL SELECT 'lecturer', 'Thiết kế lại trải nghiệm thư viện số của trường', 'Khảo sát người dùng thư viện số và thiết kế giao diện mới.', 'Prototype đã kiểm thử.', 'Figma', 'Figma', 'Thiết kế trải nghiệm', 1, 'pending'
 ) t
 JOIN users u ON u.username = t.owner JOIN lecturers l ON l.user_id = u.id

@@ -367,7 +367,7 @@ function import_users(array $rows): array
             $username = ($row['username'] ?? '') ?: ($code ?: strstr($email, '@', true));
             $gpa = ($row['gpa'] ?? '') !== '' ? max(0.0, min(4.0, (float) str_replace(',', '.', $row['gpa']))) : null;
             $credits = ($row['credits'] ?? '') !== '' ? max(0, (int) $row['credits']) : null;
-            database_transaction(static function (PDO $connection) use ($row, $role, $email, $code, $username, $gpa, $credits, &$created, &$updated): void {
+            database_transaction(static function (PDO $connection) use ($row, $role, $email, $code, $username, $gpa, $credits, &$isNew): void {
                 $existing = page_one('SELECT id, role FROM users WHERE email = ? OR username = ? LIMIT 1', [$email, $username]);
                 if ($existing) {
                     if ($existing['role'] !== $role) {
@@ -375,7 +375,7 @@ function import_users(array $rows): array
                     }
                     $userId = (int) $existing['id'];
                     $connection->prepare('UPDATE users SET full_name = ?, phone = COALESCE(NULLIF(?, \'\'), phone) WHERE id = ?')->execute([$row['full_name'], $row['phone'] ?? '', $userId]);
-                    $updated++;
+                    $isNew = false;
                 } else {
                     $password = ($row['password'] ?? '') !== '' ? $row['password'] : bin2hex(random_bytes(8));
                     if (strlen($password) < 10 && ($row['password'] ?? '') !== '') {
@@ -383,11 +383,22 @@ function import_users(array $rows): array
                     }
                     $connection->prepare('INSERT INTO users (username, email, password_hash, full_name, phone, role, status) VALUES (?, ?, ?, ?, ?, ?, \'active\')')->execute([$username, $email, password_hash($password, PASSWORD_DEFAULT), $row['full_name'], ($row['phone'] ?? '') ?: null, $role]);
                     $userId = (int) $connection->lastInsertId();
-                    $created++;
+                    $isNew = true;
                 }
                 if ($role === 'student') {
-                    if ($code === '' && !page_one('SELECT id FROM students WHERE user_id = ?', [$userId])) {
+                    $profile = page_one('SELECT id, student_code FROM students WHERE user_id = ?', [$userId]);
+                    if ($code === '' && !$profile) {
                         throw new DomainException('thiếu mã sinh viên');
+                    }
+                    if ($code !== '') {
+                        // Ngành và khoa suy ra từ mã sinh viên, không lấy theo cột trong tệp.
+                        $major = student_code_major($code);
+                        $row['major'] = $major['name'];
+                        $row['faculty'] = $major['faculty'];
+                        $row['training_system'] = ($row['training_system'] ?? '') ?: 'Chính quy';
+                        if ($profile && $profile['student_code'] !== $code) {
+                            $connection->prepare('UPDATE students SET student_code = ? WHERE id = ?')->execute([$code, (int) $profile['id']]);
+                        }
                     }
                     $connection->prepare('INSERT INTO students (user_id, student_code, major, class_name, faculty, university, gpa, credits, training_system, skills) VALUES (?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), \'Trường Đại học Vinh\', ?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'))
                          ON DUPLICATE KEY UPDATE major = COALESCE(VALUES(major), major), class_name = COALESCE(VALUES(class_name), class_name), faculty = COALESCE(VALUES(faculty), faculty), gpa = COALESCE(VALUES(gpa), gpa), credits = COALESCE(VALUES(credits), credits), training_system = COALESCE(VALUES(training_system), training_system), skills = COALESCE(VALUES(skills), skills)')
@@ -405,8 +416,11 @@ function import_users(array $rows): array
                         }
                     }
                 } elseif ($role === 'lecturer') {
-                    $connection->prepare('INSERT INTO lecturers (user_id, lecturer_code, department, faculty, max_students) VALUES (?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'), ?) ON DUPLICATE KEY UPDATE department = COALESCE(VALUES(department), department), faculty = COALESCE(VALUES(faculty), faculty), max_students = VALUES(max_students)')
-                        ->execute([$userId, $code ?: 'GV' . $userId, $row['department'] ?? '', $row['faculty'] ?? '', max(1, (int) (($row['max_students'] ?? '') ?: 8))]);
+                    if ($code !== '' && preg_match(LECTURER_CODE_PATTERN, $code) !== 1) {
+                        throw new DomainException('mã giảng viên phải có dạng GV + 6 chữ số');
+                    }
+                    $connection->prepare('INSERT INTO lecturers (user_id, lecturer_code, department, faculty, max_students) VALUES (?, ?, NULLIF(?, \'\'), ?, ?) ON DUPLICATE KEY UPDATE department = COALESCE(VALUES(department), department), faculty = VALUES(faculty), max_students = VALUES(max_students)')
+                        ->execute([$userId, $code ?: 'GV' . str_pad((string) $userId, 6, '0', STR_PAD_LEFT), $row['department'] ?? '', SCHOOL_FACULTY, max(1, (int) (($row['max_students'] ?? '') ?: 8))]);
                 } else {
                     if (!preg_match('/^\d{10}$/', $code) && !page_one('SELECT id FROM companies WHERE user_id = ?', [$userId])) {
                         throw new DomainException('mã doanh nghiệp phải gồm 10 chữ số');
@@ -415,6 +429,8 @@ function import_users(array $rows): array
                         ->execute([$userId, $code, ($row['company_name'] ?? '') ?: $row['full_name'], $email]);
                 }
             });
+            // Chỉ đếm sau khi giao dịch thành công: dòng lỗi đã bị hoàn tác.
+            $isNew ? $created++ : $updated++;
         } catch (DomainException $error) {
             $errors[] = 'Dòng ' . $line . ': ' . $error->getMessage();
         } catch (PDOException $error) {
@@ -636,8 +652,8 @@ function serve_export(string $type, array $user): never
         case 'import_template':
             $isAdmin || $deny();
             export_csv('mau-nhap-tai-khoan', ['role', 'username', 'email', 'full_name', 'phone', 'code', 'major', 'specialization', 'class_name', 'faculty', 'gpa', 'credits', 'training_system', 'courses', 'department', 'company_name', 'password'], [
-                ['student', '', 'sv.minhanh@vinhuni.edu.vn', 'Nguyễn Minh Anh', '0912345678', '215748020110001', 'Công nghệ thông tin', 'Kỹ thuật phần mềm', '62K-CNTT1', 'Viện Kỹ thuật và Công nghệ', '3.25', '128', 'Chính quy', 'INT2208,INT3306', '', '', ''],
-                ['lecturer', '', 'gv.hoangnam@vinhuni.edu.vn', 'TS. Hoàng Nam', '', 'GV0101', '', '', '', 'Viện Kỹ thuật và Công nghệ', '', '', '', '', 'Bộ môn Kỹ thuật phần mềm', '', ''],
+                ['student', '', 'sv.minhanh@vinhuni.edu.vn', 'Nguyễn Minh Anh', '0912345678', '215748020110001', 'Công nghệ thông tin', 'Trí tuệ nhân tạo', '62K-CNTT1', SCHOOL_FACULTY, '3.25', '128', 'Chính quy', 'INT2208,INT3306', '', '', ''],
+                ['lecturer', '', 'gv.hoangnam@vinhuni.edu.vn', 'TS. Hoàng Nam', '', 'GV000101', '', '', '', SCHOOL_FACULTY, '', '', '', '', 'Khoa Công nghệ thông tin', '', ''],
                 ['company', '', 'hr@congty.vn', 'Trần Thị Lan', '0238123456', '2900123456', '', '', '', '', '', '', '', '', '', 'Công ty Cổ phần Phần mềm Nghệ An', ''],
             ]);
 

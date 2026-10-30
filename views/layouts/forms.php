@@ -208,13 +208,12 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
                 <header class="modal-head"><div><p class="eyebrow">Tạo tài khoản và hồ sơ theo vai trò</p><h2>Tạo tài khoản <?= screen_escape(['student' => 'sinh viên', 'lecturer' => 'giảng viên', 'company' => 'doanh nghiệp'][$createRole]) ?></h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
             <?= $csrfField ?><input type="hidden" name="action" value="user_create">
             <div class="form-grid"><label>Họ tên<input name="full_name" maxlength="150" required></label><label>Tên đăng nhập<input name="username" maxlength="50" required></label><label>Email<input name="email" type="email" maxlength="255" required></label><label>Mật khẩu tạm (tối thiểu 10 ký tự)<input name="password" type="password" minlength="10" required></label><input type="hidden" name="role" value="<?= screen_escape($createRole) ?>">
-                <label <?= $roleFieldAttr('student') ?>>Mã sinh viên<input name="student_code" maxlength="30" data-required-for="student" <?= $createRole === 'student' ? 'required' : '' ?>></label>
-                <label <?= $roleFieldAttr('student') ?>>Ngành học<input name="major" maxlength="150"></label>
-                <label <?= $roleFieldAttr('student') ?>>Lớp<input name="class_name" maxlength="100"></label>
+                <label <?= $roleFieldAttr('student') ?>>Mã sinh viên (15 chữ số, ngành và khóa tự suy ra từ mã)<input name="student_code" maxlength="15" minlength="15" pattern="[0-9]{15}" inputmode="numeric" placeholder="235748020110017" title="Gồm đúng 15 chữ số" data-required-for="student" <?= $createRole === 'student' ? 'required' : '' ?>></label>
+                <label <?= $roleFieldAttr('student') ?>>Lớp<input name="class_name" maxlength="100" placeholder="64K-CNTT1"></label>
                 <label <?= $roleFieldAttr('company') ?>>Mã doanh nghiệp (10 chữ số)<input name="company_code" maxlength="10" minlength="10" pattern="[0-9]{10}" inputmode="numeric" placeholder="0123456789" title="Gồm đúng 10 chữ số" data-required-for="company" <?= $createRole === 'company' ? 'required' : '' ?>></label>
                 <label <?= $roleFieldAttr('company') ?>>Tên doanh nghiệp<input name="company_name" maxlength="200" data-required-for="company" <?= $createRole === 'company' ? 'required' : '' ?>></label>
-                <label <?= $roleFieldAttr('lecturer') ?>>Mã giảng viên<input name="lecturer_code" maxlength="30" data-required-for="lecturer" <?= $createRole === 'lecturer' ? 'required' : '' ?>></label>
-                <label <?= $roleFieldAttr('lecturer') ?>>Khoa / bộ phận<input name="department" maxlength="150"></label>
+                <label <?= $roleFieldAttr('lecturer') ?>>Mã giảng viên (GV + 6 chữ số)<input name="lecturer_code" maxlength="8" pattern="GV[0-9]{6}" placeholder="GV000101" title="GV và 6 chữ số" data-required-for="lecturer" <?= $createRole === 'lecturer' ? 'required' : '' ?>></label>
+                <label <?= $roleFieldAttr('lecturer') ?>>Khoa<select name="department"><option value="">Chọn khoa</option><?php foreach (SCHOOL_DEPARTMENTS as $department): ?><option><?= screen_escape($department) ?></option><?php endforeach; ?></select></label>
             </div>
             <div class="modal-actions"><button type="button" class="button" data-dialog-close>Hủy</button><button class="button button--primary" type="submit">Tạo tài khoản</button></div>
         </form>

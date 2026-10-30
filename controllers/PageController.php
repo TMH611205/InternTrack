@@ -547,8 +547,12 @@ function load_screen_data(string $screen, array $data, array $user): array
 
             $data['description'] = trim(implode(' · ', array_filter([$profile['major'] ?? null, $profile['university'] ?? null])));
 
+            $codeInfo = student_code_info((string) ($profile['student_code'] ?? ''));
+
             $data['fields'] = [
                 ['label' => 'Mã sinh viên', 'value' => $profile['student_code'] ?? 'Chưa cập nhật'],
+                ['label' => 'Khóa · Năm nhập học', 'value' => $codeInfo ? 'K' . $codeInfo['cohort'] . ' · ' . $codeInfo['year'] : 'Chưa cập nhật'],
+                ['label' => 'Ngành · Hệ đào tạo', 'value' => trim(($profile['major'] ?? '') . ' · ' . ($profile['training_system'] ?? ''), ' ·') ?: 'Chưa cập nhật'],
                 ['label' => 'Email', 'value' => $user['email']],
                 ['label' => 'Lớp / Khoa', 'value' => trim(($profile['class_name'] ?? '') . ' · ' . ($profile['faculty'] ?? ''), ' ·') ?: 'Chưa cập nhật'],
                 ['label' => 'Số điện thoại', 'value' => $user['phone'] ?: 'Chưa cập nhật'],

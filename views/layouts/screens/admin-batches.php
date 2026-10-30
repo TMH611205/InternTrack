@@ -91,7 +91,7 @@ $batchForm = static function (?array $batch) use ($screenData, $xAction, $csrfFi
         <?php if ($screenData['majors']): ?>
         <form method="post" action="<?= screen_escape($xAction) ?>" class="form-grid"><?= $csrfField ?><input type="hidden" name="action" value="specialization_save">
             <label>Thuộc ngành<select name="major_id" required><?php foreach ($screenData['majors'] as $major): ?><option value="<?= (int) $major['id'] ?>"><?= screen_escape($major['name']) ?></option><?php endforeach; ?></select></label>
-            <label>Tên chuyên ngành<input name="name" maxlength="150" placeholder="Kỹ thuật phần mềm" required></label><button class="button button--primary" type="submit">Lưu chuyên ngành</button>
+            <label>Tên chuyên ngành<input name="name" maxlength="150" placeholder="Trí tuệ nhân tạo" required></label><button class="button button--primary" type="submit">Lưu chuyên ngành</button>
         </form>
         <?php endif; ?>
     </div>

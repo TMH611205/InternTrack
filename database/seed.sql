@@ -24,19 +24,19 @@ INSERT INTO users (username, email, password_hash, full_name, phone, role, statu
 ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), status = 'active';
 
 INSERT INTO students (user_id, student_code, gender, address, major, class_name, faculty, university, bio)
-SELECT id, 'UX22-0418', 'female', 'TP. Vinh, Nghệ An', 'Thiết kế trải nghiệm người dùng', 'UXD22A', 'Mỹ thuật công nghiệp', 'Đại học Vinh', 'Quan tâm đến sản phẩm số dễ hiểu và tôn trọng thời gian người dùng.' FROM users WHERE username = 'student'
+SELECT id, '225748020110418', 'female', 'TP. Vinh, Nghệ An', 'Công nghệ thông tin', '63K-CNTT1', 'Trường Kỹ thuật và Công nghệ', 'Đại học Vinh', 'Quan tâm đến sản phẩm số dễ hiểu và tôn trọng thời gian người dùng.' FROM users WHERE username = 'student'
 ON DUPLICATE KEY UPDATE major = VALUES(major), class_name = VALUES(class_name);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'UX22-0431', 'female', 'Thiết kế trải nghiệm người dùng', 'UXD22C', 'Mỹ thuật công nghiệp', 'Đại học Vinh' FROM users WHERE username = 'han'
+SELECT id, '225748020110431', 'female', 'Công nghệ thông tin', '63K-CNTT2', 'Trường Kỹ thuật và Công nghệ', 'Đại học Vinh' FROM users WHERE username = 'han'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'FE22-0132', 'male', 'Kỹ thuật phần mềm', 'SE22A', 'Công nghệ thông tin', 'Đại học Vinh' FROM users WHERE username = 'bao'
+SELECT id, '225748010310132', 'male', 'Kỹ thuật phần mềm', '63K-KTPM1', 'Trường Kỹ thuật và Công nghệ', 'Đại học Vinh' FROM users WHERE username = 'bao'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'UX22-0424', 'female', 'Thiết kế trải nghiệm người dùng', 'UXD22B', 'Mỹ thuật công nghiệp', 'Đại học Vinh' FROM users WHERE username = 'vy'
+SELECT id, '225748010110424', 'female', 'Khoa học máy tính', '63K-KHMT1', 'Trường Kỹ thuật và Công nghệ', 'Đại học Vinh' FROM users WHERE username = 'vy'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 INSERT INTO students (user_id, student_code, gender, major, class_name, faculty, university)
-SELECT id, 'CT22-0079', 'female', 'Truyền thông số', 'DMC22A', 'Truyền thông', 'Đại học Vinh' FROM users WHERE username = 'thao'
+SELECT id, '225751030210079', 'female', 'Công nghệ kỹ thuật điện tử - viễn thông', '63K-DTVT1', 'Trường Kỹ thuật và Công nghệ', 'Đại học Vinh' FROM users WHERE username = 'thao'
 ON DUPLICATE KEY UPDATE major = VALUES(major);
 
 INSERT INTO companies (user_id, company_code, company_name, website, email, phone, address, description, status)
@@ -53,10 +53,10 @@ SELECT id, '0100000004', 'Cửa Lò Media', 'https://lahouse.example', 'team@lah
 ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), address = VALUES(address), description = VALUES(description), status = 'active';
 
 INSERT INTO lecturers (user_id, lecturer_code, department, academic_title, specialization)
-SELECT id, 'GV-UX-001', 'Khoa Công nghệ thông tin', 'Thạc sĩ', 'Thiết kế tương tác và trải nghiệm người dùng' FROM users WHERE username = 'lecturer'
+SELECT id, 'GV000101', 'Khoa Công nghệ thông tin', 'Thạc sĩ', 'Thiết kế tương tác và trải nghiệm người dùng' FROM users WHERE username = 'lecturer'
 ON DUPLICATE KEY UPDATE department = VALUES(department);
 INSERT INTO lecturers (user_id, lecturer_code, department, academic_title, specialization)
-SELECT id, 'GV-SE-014', 'Khoa Công nghệ thông tin', 'Thạc sĩ', 'Phát triển phần mềm' FROM users WHERE username = 'lecturer2'
+SELECT id, 'GV000102', 'Khoa Công nghệ thông tin', 'Thạc sĩ', 'Phát triển phần mềm' FROM users WHERE username = 'lecturer2'
 ON DUPLICATE KEY UPDATE department = VALUES(department);
 
 INSERT INTO positions (company_id, title, description, requirements, benefits, location, quantity, deadline, status)
@@ -98,7 +98,7 @@ FROM students s
 JOIN users su ON su.id = s.user_id AND su.username = 'student'
 JOIN companies c ON c.company_code = '0100000001'
 JOIN positions p ON p.company_id = c.id AND p.title = 'Product Design Intern'
-JOIN lecturers l ON l.lecturer_code = 'GV-UX-001'
+JOIN lecturers l ON l.lecturer_code = 'GV000101'
 WHERE NOT EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND i.position_id = p.id AND i.start_date = '2026-09-01');
 INSERT INTO internships (student_id, company_id, position_id, lecturer_id, start_date, end_date, actual_end_date, status, description, final_score)
 SELECT s.id, c.id, p.id, l.id, '2026-01-06', '2026-03-28', '2026-03-27', 'completed', 'Hỗ trợ nghiên cứu và thiết kế trải nghiệm học tập.', 89.00
@@ -106,7 +106,7 @@ FROM students s
 JOIN users su ON su.id = s.user_id AND su.username = 'bao'
 JOIN companies c ON c.company_code = '0100000002'
 JOIN positions p ON p.company_id = c.id AND p.title = 'UX Research Intern'
-JOIN lecturers l ON l.lecturer_code = 'GV-SE-014'
+JOIN lecturers l ON l.lecturer_code = 'GV000102'
 WHERE NOT EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND i.position_id = p.id AND i.start_date = '2026-01-06');
 
 INSERT INTO applications (student_id, position_id, status, applied_at, reviewed_at, reviewed_by, note)
@@ -142,7 +142,7 @@ SELECT i.id, i.student_id, seed.diary_date, seed.title, seed.content, seed.hours
 FROM internships i
 JOIN students s ON s.id = i.student_id
 JOIN users su ON su.id = s.user_id AND su.username = 'student'
-JOIN lecturers l ON l.lecturer_code = 'GV-UX-001'
+JOIN lecturers l ON l.lecturer_code = 'GV000101'
 JOIN (
     SELECT '2026-09-28' AS diary_date, 'Rà soát prototype onboarding' AS title, 'Kiểm tra luồng tạo tài khoản trên mobile, ghi nhận ba điểm gây nhầm lẫn và cập nhật prototype.' AS content, 7.5 AS hours, 'submitted' AS status, NULL AS reviewed_at, NULL AS feedback
     UNION ALL SELECT '2026-09-27', 'Phỏng vấn người dùng nội bộ', 'Thực hiện hai buổi phỏng vấn với nhóm hỗ trợ khách hàng và tổng hợp insight.', 8.0, 'approved', '2026-09-28 09:30:00', 'Câu hỏi rõ ràng, ghi lại thêm trích dẫn người dùng ở lần sau.'
@@ -156,7 +156,7 @@ SELECT i.id, i.student_id, seed.report_type, seed.title, seed.content, seed.stat
 FROM internships i
 JOIN students s ON s.id = i.student_id
 JOIN users su ON su.id = s.user_id AND su.username = 'student'
-JOIN lecturers l ON l.lecturer_code = 'GV-UX-001'
+JOIN lecturers l ON l.lecturer_code = 'GV000101'
 JOIN (
     SELECT 'proposal' AS report_type, 'Đề cương thực tập Product Design' AS title, 'Mục tiêu: nghiên cứu và cải thiện luồng onboarding cho nền tảng quản lý bán lẻ.' AS content, 'approved' AS status, '2026-09-05 10:00:00' AS submitted_at, '2026-09-08 14:00:00' AS reviewed_at, 'Phạm vi phù hợp, bổ sung tiêu chí đo lường cho thử nghiệm.' AS feedback
     UNION ALL SELECT 'midterm', 'Báo cáo thực tập giữa kỳ', 'Tổng kết quá trình tìm hiểu sản phẩm, nghiên cứu người dùng và prototype giữa kỳ.', 'submitted', '2026-09-29 08:42:00', NULL, NULL

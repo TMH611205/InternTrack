@@ -39,6 +39,20 @@ function action_user(array $allowedRoles): array
     return $user;
 }
 
+// Kiểm tra mã sinh viên và trả về ngành (name, faculty) suy ra từ mã ngành nằm trong mã.
+function student_code_major(string $code): array
+{
+    $info = student_code_info($code);
+    if ($info === null) {
+        throw new DomainException('Mã sinh viên phải gồm 15 chữ số, ví dụ 235748020110017.');
+    }
+    $major = page_one('SELECT name, faculty FROM majors WHERE code = ?', [$info['major_code']]);
+    if (!$major) {
+        throw new DomainException('Mã ngành ' . $info['major_code'] . ' trong mã sinh viên không thuộc danh mục ngành của trường.');
+    }
+    return $major;
+}
+
 // Đọc và validate dữ liệu text từ form trước khi lưu vào database.
 // Đảm bảo không có dữ liệu rỗng quá dài hoặc không hợp lệ đi qua.
 function action_value(array $input, string $key, int $maximum = 5000): string
@@ -1112,7 +1126,7 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     $connection->prepare('INSERT INTO user_roles (user_id, role) VALUES (?, ?)')->execute([(int) $target['id'], $extra]);
                     // Quản trị kiêm giảng viên cần hồ sơ giảng viên để hướng dẫn / chấm.
                     if ($extra === 'lecturer' && !$target['lecturer_id']) {
-                        $connection->prepare('INSERT INTO lecturers (user_id, lecturer_code) VALUES (?, ?)')->execute([(int) $target['id'], 'GV' . str_pad((string) $target['id'], 5, '0', STR_PAD_LEFT)]);
+                        $connection->prepare('INSERT INTO lecturers (user_id, lecturer_code) VALUES (?, ?)')->execute([(int) $target['id'], 'GV' . str_pad((string) $target['id'], 6, '0', STR_PAD_LEFT)]);
                     }
                 }
                 $connection->prepare('UPDATE users SET scope_faculty = ? WHERE id = ?')->execute([$scope ?: null, (int) $target['id']]);
@@ -1283,10 +1297,11 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                 $newUserId = (int) $connection->lastInsertId();
                 if ($role === 'student') {
                     $studentCode = action_value($input, 'student_code', 30);
-                    if ($studentCode === '') {
-                        throw new DomainException('Mã sinh viên là bắt buộc.');
+                    $major = student_code_major($studentCode);
+                    if (page_one('SELECT id FROM students WHERE student_code = ?', [$studentCode])) {
+                        throw new DomainException('Mã sinh viên này đã được sử dụng.');
                     }
-                    $connection->prepare('INSERT INTO students (user_id, student_code, major, class_name, faculty, university) VALUES (?, ?, ?, ?, ?, ?)')->execute([$newUserId, $studentCode, action_value($input, 'major', 150), action_value($input, 'class_name', 100), action_value($input, 'faculty', 150), action_value($input, 'university', 200)]);
+                    $connection->prepare('INSERT INTO students (user_id, student_code, major, class_name, faculty, university, training_system) VALUES (?, ?, ?, ?, ?, \'Trường Đại học Vinh\', \'Chính quy\')')->execute([$newUserId, $studentCode, $major['name'], action_value($input, 'class_name', 100), $major['faculty']]);
                 } elseif ($role === 'company') {
                     $companyCode = action_value($input, 'company_code', 30);
                     $companyName = action_value($input, 'company_name', 200);
@@ -1302,10 +1317,13 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     $connection->prepare('INSERT INTO companies (user_id, company_code, company_name, email, status) VALUES (?, ?, ?, ?, \'pending\')')->execute([$newUserId, $companyCode, $companyName, $email]);
                 } else {
                     $lecturerCode = action_value($input, 'lecturer_code', 30);
-                    if ($lecturerCode === '') {
-                        throw new DomainException('Mã giảng viên là bắt buộc.');
+                    if (preg_match(LECTURER_CODE_PATTERN, $lecturerCode) !== 1) {
+                        throw new DomainException('Mã giảng viên phải có dạng GV + 6 chữ số, ví dụ GV000101.');
                     }
-                    $connection->prepare('INSERT INTO lecturers (user_id, lecturer_code, department) VALUES (?, ?, ?)')->execute([$newUserId, $lecturerCode, action_value($input, 'department', 150)]);
+                    if (page_one('SELECT id FROM lecturers WHERE lecturer_code = ?', [$lecturerCode])) {
+                        throw new DomainException('Mã giảng viên này đã được sử dụng.');
+                    }
+                    $connection->prepare('INSERT INTO lecturers (user_id, lecturer_code, department, faculty) VALUES (?, ?, ?, ?)')->execute([$newUserId, $lecturerCode, action_value($input, 'department', 150), SCHOOL_FACULTY]);
                 }
                 $connection->commit();
             } catch (Throwable $error) {

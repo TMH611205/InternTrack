@@ -4,6 +4,6 @@
 </FilesMatch>
 
 # Chặn các thư mục chỉ chứa mã nguồn nội bộ; ứng dụng luôn đi qua index.php.
-RedirectMatch 403 ^/(?:[^/]+/)?(?:config|controllers|models|views|database|vendor|\.git)(?:/|$)
+RedirectMatch 403 ^/(?:[^/]+/)?(?:config|controllers|models|views|database|scripts|vendor|\.git)(?:/|$)
 
 Options -Indexes

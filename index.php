@@ -227,6 +227,15 @@ if ($downloadType !== '') {
     }
     serve_workspace_download($downloadType, $downloadId, $user);
 }
+$exportType = is_string($_GET['export'] ?? null) ? $_GET['export'] : '';
+if ($exportType !== '') {
+    if ($user === null) {
+        http_response_code(401);
+        exit('Vui lòng đăng nhập để xuất báo cáo.');
+    }
+    require_once __DIR__ . '/controllers/ExportController.php';
+    export_serve($exportType, $user);
+}
 $publicPages = ['auth/login', 'auth/forgot-password', 'auth/reset-password'];
 if ($user === null && !in_array($route, $publicPages, true)) {
     app_set_flash('error', 'Vui lòng đăng nhập để tiếp tục.');

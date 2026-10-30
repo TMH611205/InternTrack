@@ -151,14 +151,15 @@ function app_env(string $key, mixed $default = null): mixed
     return $default;
 }
 
-function app_send_password_reset_otp(string $email, string $otp): bool
+// Gửi một email văn bản thuần qua SMTP (Gmail). Trả về false nếu chưa cấu hình hoặc gửi lỗi.
+function app_send_mail(string $email, string $subject, string $body): bool
 {
     $fallbackSender = (string) (app_env('MAIL_USERNAME', '') ?: '');
     $sender = (string) (app_env('MAIL_FROM', $fallbackSender) ?: $fallbackSender);
     $username = (string) (app_env('MAIL_USERNAME', $sender) ?: $sender);
     $password = (string) (app_env('MAIL_PASSWORD', '') ?: '');
     if (!filter_var($sender, FILTER_VALIDATE_EMAIL) || !filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
-        error_log('InternTrack password reset OTP could not be sent: MAIL_FROM or MAIL_PASSWORD is not configured.');
+        error_log('InternTrack mail could not be sent: MAIL_FROM or MAIL_PASSWORD is not configured.');
         return false;
     }
 
@@ -181,14 +182,23 @@ function app_send_password_reset_otp(string $email, string $otp): bool
         $mailer->CharSet = 'UTF-8';
         $mailer->setFrom($sender, (string) (app_env('MAIL_FROM_NAME', APP_NAME) ?: APP_NAME));
         $mailer->addAddress($email);
-        $mailer->Subject = 'InternTrack - Ma OTP dat lai mat khau';
-        $mailer->Body = "Xin chào,\r\n\r\nMã OTP đặt lại mật khẩu InternTrack của bạn là: " . $otp . "\r\nMã có hiệu lực trong 60 giây và chỉ dùng một lần.\r\n\r\nNếu bạn không yêu cầu mã này, hãy bỏ qua email.\r\n";
+        $mailer->Subject = $subject;
+        $mailer->Body = $body;
         $mailer->send();
         return true;
     } catch (Throwable $error) {
         error_log('InternTrack Gmail SMTP delivery failed: ' . $error->getMessage());
         return false;
     }
+}
+
+function app_send_password_reset_otp(string $email, string $otp): bool
+{
+    return app_send_mail(
+        $email,
+        'InternTrack - Ma OTP dat lai mat khau',
+        "Xin chào,\r\n\r\nMã OTP đặt lại mật khẩu InternTrack của bạn là: " . $otp . "\r\nMã có hiệu lực trong 60 giây và chỉ dùng một lần.\r\n\r\nNếu bạn không yêu cầu mã này, hãy bỏ qua email.\r\n"
+    );
 }
 
 // Chuyển hướng người dùng đến một route cụ thể trong dự án.

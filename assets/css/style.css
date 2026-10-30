@@ -3621,3 +3621,58 @@ dialog.modal .modal-actions {
 .task-card .task-edit-trigger {
   margin-top: 8px;
 }
+
+/* Thống kê dạng thanh ngang và công cụ của quản trị viên */
+.stats-panel,
+.tools-panel {
+  margin-top: 17px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 21px;
+  margin-top: 15px;
+}
+.stats-card h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+.stats-card .muted {
+  margin: 0 0 13px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.hbar {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 9px;
+  font-size: 11px;
+}
+.hbar-track {
+  height: 9px;
+  background: var(--green-pale);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.hbar-track span {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+.hbar-value {
+  text-align: right;
+  color: var(--muted);
+}
+.tools-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+  margin-top: 13px;
+}
+@media (max-width: 960px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -41,6 +41,64 @@ function page_date(?string $date): string
     return $date ? date('d/m/Y', strtotime($date)) : 'Chưa cập nhật';
 }
 
+// Chuyển các cặp [nhãn, số lượng] thành dữ liệu cho biểu đồ thanh ngang; phần trăm tính theo tổng.
+function page_chart_items(array $pairs, bool $showShare = true): array
+{
+    $total = array_sum(array_map(static fn($pair) => $pair[1], $pairs));
+    $maximum = max(1, ...array_map(static fn($pair) => $pair[1], $pairs ?: [['', 0]]));
+    return array_map(static fn($pair) => [
+        'label' => $pair[0],
+        'percent' => (int) round($pair[1] * 100 / $maximum),
+        'text' => $pair[1] . ($showShare && $total ? ' (' . (int) round($pair[1] * 100 / $total) . '%)' : ''),
+    ], $pairs);
+}
+
+// Ba biểu đồ thống kê của quản trị viên: trạng thái kỳ thực tập, phân bố điểm đánh giá, tỷ lệ nộp nhật ký theo tuần.
+function page_admin_charts(): array
+{
+    $statusLabels = ['planned' => 'Sắp bắt đầu', 'active' => 'Đang diễn ra', 'completed' => 'Hoàn thành', 'cancelled' => 'Đã hủy'];
+    $statusCounts = array_fill_keys(array_keys($statusLabels), 0);
+    foreach (page_all('SELECT status, COUNT(*) AS total FROM internships GROUP BY status') as $row) {
+        $statusCounts[$row['status']] = (int) $row['total'];
+    }
+    $statusPairs = [];
+    foreach ($statusLabels as $key => $label) {
+        $statusPairs[] = [$label, $statusCounts[$key]];
+    }
+
+    // Điểm tổng của các đánh giá đã gửi, thang 100, chia bốn khoảng.
+    $bands = ['Dưới 50' => 0, '50 - 69' => 0, '70 - 84' => 0, '85 - 100' => 0];
+    foreach (page_all('SELECT overall_score FROM evaluations WHERE status = \'submitted\' AND overall_score IS NOT NULL') as $row) {
+        $score = (float) $row['overall_score'];
+        $bands[$score < 50 ? 'Dưới 50' : ($score < 70 ? '50 - 69' : ($score < 85 ? '70 - 84' : '85 - 100'))]++;
+    }
+    $bandPairs = [];
+    foreach ($bands as $label => $count) {
+        $bandPairs[] = [$label, $count];
+    }
+
+    // Tỷ lệ kỳ thực tập đang diễn ra có ít nhất một nhật ký đã nộp trong từng tuần, bốn tuần gần nhất.
+    $activeTotal = $statusCounts['active'];
+    $weeks = [];
+    for ($offset = 3; $offset >= 0; $offset--) {
+        $start = date('Y-m-d', strtotime('monday this week -' . $offset . ' week'));
+        $end = date('Y-m-d', strtotime($start . ' +6 days'));
+        $submitted = page_count(
+            'SELECT COUNT(DISTINCT d.internship_id) FROM diaries d JOIN internships i ON i.id = d.internship_id
+             WHERE i.status = \'active\' AND d.status IN (\'submitted\', \'approved\') AND d.diary_date BETWEEN ? AND ?',
+            [$start, $end]
+        );
+        $percent = $activeTotal ? (int) round($submitted * 100 / $activeTotal) : 0;
+        $weeks[] = ['label' => date('d/m', strtotime($start)) . ' - ' . date('d/m', strtotime($end)), 'percent' => $percent, 'text' => $submitted . '/' . $activeTotal . ' (' . $percent . '%)'];
+    }
+
+    return [
+        ['title' => 'Kỳ thực tập theo trạng thái', 'note' => 'Số kỳ thực tập hiện có trong hệ thống.', 'items' => page_chart_items($statusPairs)],
+        ['title' => 'Phân bố điểm đánh giá', 'note' => 'Điểm tổng (thang 100) của các đánh giá đã gửi.', 'items' => page_chart_items($bandPairs)],
+        ['title' => 'Nộp nhật ký theo tuần', 'note' => 'Kỳ thực tập đang diễn ra có ít nhất một nhật ký trong tuần.', 'items' => $weeks],
+    ];
+}
+
 function page_week_bars(string $sql, array $parameters = []): array
 {
     $bars = array_fill(0, 7, 0);
@@ -785,6 +843,7 @@ function load_screen_data(string $screen, array $data, array $user): array
             ];
             $data['progress'] = ['label' => 'Doanh nghiệp đã xác minh', 'value' => ($companyCount ? (int) round($activeCompanyCount * 100 / $companyCount) : 0) . '%', 'note' => $activeCompanyCount . '/' . $companyCount . ' doanh nghiệp đã kích hoạt'];
             $data['bars'] = page_week_bars('SELECT WEEKDAY(applied_at) AS day, COUNT(*) AS total FROM applications WHERE YEARWEEK(applied_at, 1) = YEARWEEK(CURDATE(), 1) GROUP BY day');
+            $data['charts'] = page_admin_charts();
             $pendingCompanies = page_all('SELECT company_name, created_at FROM companies WHERE status = \'pending\' ORDER BY created_at DESC LIMIT 4');
             $data['activities'] = array_map(static fn($row) => ['time' => page_date($row['created_at']), 'title' => $row['company_name'], 'description' => 'Hồ sơ doanh nghiệp đang chờ xác minh.', 'status' => 'Chờ xác minh'], $pendingCompanies);
             if (!$data['activities']) {

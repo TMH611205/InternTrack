@@ -14,6 +14,7 @@ $screenData += [
     'progress' => ['label' => 'Tiến độ', 'value' => '0%', 'note' => ''],
     'metrics' => [],
     'bars' => [],
+    'charts' => [],
     'activities' => [],
     'columns' => [],
     'rows' => [],
@@ -44,6 +45,8 @@ $primaryActions = [
     'admin/dashboard' => ['label' => 'Quản lý sinh viên', 'href' => '?page=admin/students'],
 ];
 $primaryActions['company/tasks'] = ['label' => 'Giao nhiệm vụ', 'href' => '#new-task'];
+$primaryActions['admin/internship'] = ['label' => 'Xuất danh sách (CSV)', 'href' => '?export=internships'];
+$primaryActions['lecturer/students'] = ['label' => 'Xuất danh sách (CSV)', 'href' => '?export=my_students'];
 if ($screen === 'student/internship-detail' && !empty($screenData['position_id']) && empty($screenData['application_status'])) {
     $primaryActions[$screen] = ['label' => 'Ứng tuyển vị trí', 'href' => '#application-form'];
 }
@@ -148,6 +151,33 @@ $primaryAction = $primaryActions[$screen] ?? null;
                 </div>
             </article>
         </section>
+        <?php if (!empty($screenData['charts'])): ?>
+            <section class="panel stats-panel">
+                <div class="panel-heading"><div><p class="eyebrow">Thống kê</p><h2>Tình hình thực tập</h2></div></div>
+                <div class="stats-grid">
+                    <?php foreach ($screenData['charts'] as $chart): ?>
+                        <article class="stats-card">
+                            <h3><?= screen_escape($chart['title']) ?></h3>
+                            <p class="muted"><?= screen_escape($chart['note']) ?></p>
+                            <?php foreach ($chart['items'] as $item): ?>
+                                <div class="hbar"><span class="hbar-label"><?= screen_escape($item['label']) ?></span><span class="hbar-track"><span style="width: <?= (int) $item['percent'] ?>%"></span></span><span class="hbar-value"><?= screen_escape($item['text']) ?></span></div>
+                            <?php endforeach; ?>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php endif; ?>
+        <?php if ($screen === 'admin/dashboard'): ?>
+            <section class="panel tools-panel">
+                <div class="panel-heading"><div><p class="eyebrow">Báo cáo và nhắc hạn</p><h2>Công cụ của khoa</h2></div></div>
+                <p class="muted">Xuất dữ liệu để mở bằng Excel, hoặc gửi nhắc hạn tới sinh viên chưa ghi nhật ký, nhiệm vụ sắp hoặc đã quá hạn và hồ sơ doanh nghiệp chờ xác minh.</p>
+                <div class="tools-actions">
+                    <a class="button button--secondary" href="?export=internships">Xuất danh sách kỳ thực tập</a>
+                    <a class="button button--secondary" href="?export=evaluations">Xuất bảng điểm đánh giá</a>
+                    <form method="post" action="<?= screen_escape($formAction) ?>"><?= $csrfField ?><input type="hidden" name="action" value="run_reminders"><button class="button button--primary" type="submit">Gửi nhắc hạn ngay</button></form>
+                </div>
+            </section>
+        <?php endif; ?>
         <?php if ($screen === 'admin/dashboard' && ai_match_enabled()): ?>
             <section class="panel skill-panel">
                 <div class="panel-heading">

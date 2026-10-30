@@ -47,6 +47,7 @@
 - **AI tóm tắt và chấm sơ bộ** nhật ký, báo cáo; đối chiếu kế hoạch, đánh dấu sơ sài hoặc chép lại tuần trước.
 - **Cảnh báo sớm sinh viên có nguy cơ** (trang Tiến độ) kèm gợi ý can thiệp.
 - **AI soạn nhận xét cuối kỳ** từ đánh giá của doanh nghiệp và giảng viên.
+- **Xuất danh sách sinh viên phụ trách** (CSV, mở được bằng Excel) kèm số nhật ký, nhiệm vụ, báo cáo.
 
 ### Quản trị viên (khoa)
 
@@ -54,7 +55,9 @@
 - Quản lý **kỳ thực tập**: đổi trạng thái, phân công giảng viên, nhập kế hoạch, và **giao kế hoạch chung cho cả một ngành** (có danh sách ngành, tìm kiếm).
 - Mã doanh nghiệp (10 chữ số) chỉ nhập lúc tạo, **không chỉnh sửa được** sau đó.
 - Quản lý **tài liệu của khoa** (quy định, mốc thời gian, biểu mẫu) làm nguồn cho trợ lý hỏi đáp.
-- Bảng điều khiển có thống kê và **thống kê kỹ năng doanh nghiệp đang cần** do AI tổng hợp, kèm gợi ý điều chỉnh chương trình.
+- Bảng điều khiển có thống kê, **biểu đồ** (kỳ thực tập theo trạng thái, phân bố điểm đánh giá, tỷ lệ nộp nhật ký theo tuần) và **thống kê kỹ năng doanh nghiệp đang cần** do AI tổng hợp, kèm gợi ý điều chỉnh chương trình.
+- **Xuất báo cáo CSV**: danh sách kỳ thực tập và bảng điểm đánh giá.
+- **Nhắc hạn**: nút "Gửi nhắc hạn ngay" hoặc lệnh `php scripts/send_reminders.php` (xem phần Nhắc hạn).
 
 ## Công nghệ
 
@@ -143,6 +146,26 @@ Bật bằng cách lấy khóa miễn phí tại <https://aistudio.google.com/ap
 
 **Quyền riêng tư:** CV, nhật ký, báo cáo và nhận xét được gửi tới Google để phân tích. Với gói miễn phí, Google có thể dùng dữ liệu này để cải thiện sản phẩm. Hãy thông báo cho người dùng hoặc chuyển sang gói trả phí trước khi triển khai thật.
 
+## Nhắc hạn tự động
+
+`controllers/ReminderController.php` tạo thông báo trong hệ thống (và gửi thêm email nếu đã cấu hình `MAIL_*`) cho:
+
+- sinh viên có kỳ thực tập đang diễn ra nhưng **chưa có nhật ký nào trong 7 ngày**;
+- sinh viên có nhiệm vụ chưa nộp **đến hạn trong 2 ngày tới hoặc đã quá hạn**;
+- mọi quản trị viên khi có hồ sơ doanh nghiệp **chờ xác minh quá 3 ngày**.
+
+Mỗi người chỉ nhận một lần trong ngày cho cùng một nội dung, nên chạy lại nhiều lần không gây nhắc trùng. Chạy tay bằng nút ở bảng điều khiển quản trị viên, hoặc đặt lịch hằng ngày:
+
+```text
+php scripts/send_reminders.php
+```
+
+Windows: Task Scheduler; Linux: cron (ví dụ `0 7 * * * php /đường/dẫn/InternTrack/scripts/send_reminders.php`). Thư mục `scripts/` bị `.htaccess` chặn và tập lệnh chỉ chạy trên dòng lệnh.
+
+## Xuất báo cáo CSV
+
+Đường dẫn `?export=<loại>` (cần đăng nhập, kiểm tra vai trò): `internships` và `evaluations` (quản trị viên), `my_students` (giảng viên, chỉ sinh viên mình phụ trách). Tệp mã hóa UTF-8 có BOM để Excel hiển thị đúng tiếng Việt; ô bắt đầu bằng `= + - @` được thêm dấu nháy đơn để tránh chèn công thức.
+
 ## Gửi OTP quên mật khẩu bằng Gmail
 
 OTP gồm 6 chữ số, lưu dạng **SHA-256 hash**, hết hạn sau **60 giây**, chỉ xác minh một lần, tối đa **5 lần nhập sai**, và chỉ được gửi lại sau **60 giây**. Form đặt mật khẩu chỉ hiện sau khi máy chủ xác minh OTP hợp lệ; OTP chỉ được chấp nhận khi Gmail báo gửi thành công.
@@ -178,12 +201,15 @@ InternTrack/
 │   ├── ActionController.php       # Mọi thao tác POST nghiệp vụ + tải tệp có kiểm tra quyền
 │   ├── PageController.php         # Nạp dữ liệu cho từng màn hình
 │   ├── NotificationController.php # Thông báo theo mục
+│   ├── ReminderController.php     # Nhắc hạn (thông báo + email), dùng cho nút quản trị và scripts/send_reminders.php
+│   ├── ExportController.php       # Xuất báo cáo CSV theo vai trò
 │   ├── AiMatchController.php      # Gemini: gợi ý ghép vị trí, bong bóng chat, lõi gọi API
 │   └── AiInsightController.php    # Gemini: tóm tắt nhật ký/báo cáo, rủi ro, nhận xét cuối kỳ, kỹ năng
 ├── views/
 │   ├── <vai_trò>/<màn_hình>.php   # Mỗi tệp chỉ khai báo $screen rồi gọi layout chung
 │   └── layouts/                   # screen, header, sidebar, content, forms, footer, page-data, ai-insight
 ├── assets/                        # css/style.css, js/app.js, images/ (logo, favicon SVG)
+├── scripts/                       # send_reminders.php (chạy dòng lệnh)
 ├── database/                      # interntrack.sql (schema đầy đủ), seed.sql (dữ liệu mẫu)
 ├── uploads/                       # Tệp người dùng tải lên (Apache chặn truy cập trực tiếp)
 ├── .env.example · composer.json · .htaccess
@@ -216,7 +242,7 @@ Schema đã gộp mọi migration cũ. Với database cài từ phiên bản tr�
 ## Bảo mật và quyền riêng tư
 
 - Mật khẩu băm bằng `password_hash()`; CSRF token cho mọi POST; PDO prepared statement; escape đầu ra.
-- `.htaccess` chặn truy cập trực tiếp tới `.env`, `*.sql`, `*.md`, `composer.*`, `config/`, `controllers/`, `views/`, `database/` và `vendor/`; tắt liệt kê thư mục.
+- `.htaccess` chặn truy cập trực tiếp tới `.env`, `*.sql`, `*.md`, `composer.*`, `config/`, `controllers/`, `views/`, `database/`, `scripts/` và `vendor/`; tắt liệt kê thư mục.
 - Tệp trong `uploads/` bị chặn truy cập trực tiếp, chỉ được phục vụ qua endpoint tải có kiểm tra quyền (ảnh đại diện hiển thị cho mọi người dùng đã đăng nhập). Tệp tải lên được kiểm tra MIME thực và dung lượng, không chỉ dựa vào phần mở rộng.
 - Kết quả AI luôn được escape trước khi hiển thị; liên kết trong khung chat chỉ được tạo từ mã vị trí dạng số.
 - Mỗi giảng viên chỉ thấy và phân tích sinh viên mình phụ trách; doanh nghiệp chỉ thao tác trên thực tập sinh của mình.

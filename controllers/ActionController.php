@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/AiMatchController.php';
 require_once __DIR__ . '/AiInsightController.php';
+require_once __DIR__ . '/ReminderController.php';
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/AuthController.php';
@@ -196,6 +197,12 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $notificationSection = action_value($input, 'section', 40);
             notification_mark_read((int) $user['id'], $notificationId ?: null, $notificationId ? null : ($notificationSection ?: null));
             $successMessage = 'Đã đánh dấu đã đọc.';
+            break;
+
+        case 'run_reminders':
+            action_user(['admin']);
+            $reminders = reminder_run();
+            $successMessage = 'Đã gửi nhắc hạn: ' . $reminders['diary'] . ' nhắc nhật ký, ' . $reminders['tasks'] . ' nhắc nhiệm vụ, ' . $reminders['companies'] . ' nhắc xác minh doanh nghiệp (' . $reminders['emails'] . ' email).';
             break;
 
         case 'ai_match':

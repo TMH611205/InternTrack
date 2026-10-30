@@ -85,7 +85,7 @@ $batchForm = static function (?array $batch) use ($screenData, $xAction, $csrfFi
         <div class="chip-row"><?php foreach ($screenData['majors'] as $major): ?><span class="chip"><?= screen_escape($major['code'] . ' · ' . $major['name']) ?></span><?php endforeach; ?></div>
         <form method="post" action="<?= screen_escape($xAction) ?>" class="form-grid"><?= $csrfField ?><input type="hidden" name="action" value="major_save">
             <label>Mã ngành<input name="code" maxlength="30" placeholder="7480201" required></label><label>Tên ngành<input name="name" maxlength="150" placeholder="Công nghệ thông tin" required></label>
-            <label>Khoa / Viện<input name="faculty" maxlength="150"></label><button class="button button--primary" type="submit">Lưu ngành</button>
+            <button class="button button--primary" type="submit">Lưu ngành</button>
         </form>
         <div class="chip-row"><?php foreach ($screenData['specializations'] as $specialization): ?><span class="chip"><?= screen_escape($specialization['major_name'] . ' · ' . $specialization['name']) ?></span><?php endforeach; ?></div>
         <?php if ($screenData['majors']): ?>

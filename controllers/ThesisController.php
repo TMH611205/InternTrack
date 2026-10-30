@@ -998,7 +998,7 @@ function thesis_handle_action(string $action, array $input, array $files): ?arra
             if ($code === '' || $name === '') {
                 throw new DomainException('Hãy nhập mã và tên ngành.');
             }
-            $connection->prepare('INSERT INTO majors (code, name, faculty) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), faculty = VALUES(faculty)')->execute([$code, $name, action_value($input, 'faculty', 150) ?: null]);
+            $connection->prepare('INSERT INTO majors (code, name, faculty) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), faculty = VALUES(faculty)')->execute([$code, $name, SCHOOL_FACULTY]);
             return $done('admin/batches', 'Đã lưu ngành ' . $name . '.');
 
         case 'specialization_save':

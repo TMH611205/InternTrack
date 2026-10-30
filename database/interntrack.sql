@@ -893,8 +893,8 @@ CREATE TABLE IF NOT EXISTS specializations (
     CONSTRAINT fk_specializations_major FOREIGN KEY (major_id) REFERENCES majors(id) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Danh mục ngành của Trường Kỹ thuật và Công nghệ, Đại học Vinh.
-INSERT INTO majors (code, name, faculty) VALUES
+-- Danh mục ngành của Trường Kỹ thuật và Công nghệ, Đại học Vinh. Chỉ thêm ngành còn thiếu, giữ chỉnh sửa của quản trị viên.
+INSERT IGNORE INTO majors (code, name, faculty) VALUES
 ('7480101', 'Khoa học máy tính', 'Trường Kỹ thuật và Công nghệ'),
 ('7480103', 'Kỹ thuật phần mềm', 'Trường Kỹ thuật và Công nghệ'),
 ('7480201', 'Công nghệ thông tin', 'Trường Kỹ thuật và Công nghệ'),
@@ -904,8 +904,7 @@ INSERT INTO majors (code, name, faculty) VALUES
 ('7510302', 'Công nghệ kỹ thuật điện tử - viễn thông', 'Trường Kỹ thuật và Công nghệ'),
 ('7510303', 'Công nghệ kỹ thuật điều khiển và tự động hóa', 'Trường Kỹ thuật và Công nghệ'),
 ('7520207', 'Kỹ thuật điện tử - viễn thông', 'Trường Kỹ thuật và Công nghệ'),
-('7520216', 'Kỹ thuật điều khiển và tự động hóa', 'Trường Kỹ thuật và Công nghệ')
-ON DUPLICATE KEY UPDATE name = VALUES(name), faculty = VALUES(faculty);
+('7520216', 'Kỹ thuật điều khiển và tự động hóa', 'Trường Kỹ thuật và Công nghệ');
 
 INSERT IGNORE INTO specializations (major_id, name)
 SELECT id, 'Trí tuệ nhân tạo' FROM majors WHERE code = '7480201'

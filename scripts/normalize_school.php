@@ -19,6 +19,14 @@ if ($sample !== ['year' => 2023, 'cohort' => 64, 'major_code' => '7480201'] || s
 }
 
 $connection = database();
+// Tùy chọn --database=<tên>: chạy trên CSDL khác cùng máy chủ (ví dụ bản sao để chạy thử).
+foreach (array_slice($argv, 1) as $argument) {
+    if (preg_match('/^--database=(\w+)$/', $argument, $match)) {
+        $connection->exec('USE `' . $match[1] . '`');
+    }
+}
+// CSDL cũ gán nhầm 7480201 cho Kỹ thuật phần mềm, thuộc Viện: sửa lại để không bị xóa ở dưới.
+$connection->prepare('UPDATE majors SET name = \'Công nghệ thông tin\', faculty = ? WHERE code = \'7480201\' AND name = \'Kỹ thuật phần mềm\'')->execute([SCHOOL_FACULTY]);
 // Chưa chạy migrate thì danh mục ngành của trường chưa có: nếu tiếp tục sẽ xóa sạch bảng majors.
 $catalog = $connection->prepare('SELECT COUNT(*) FROM majors WHERE faculty = ?');
 $catalog->execute([SCHOOL_FACULTY]);

@@ -333,6 +333,14 @@ function import_column_key(string $header): string
     return $aliases[$key] ?? $key;
 }
 
+// Chặn mã đã thuộc tài khoản khác: nếu không, ON DUPLICATE KEY của lệnh nhập sẽ sửa nhầm hồ sơ của người đó.
+function import_require_free_code(string $table, string $column, string $code, int $userId): void
+{
+    if (page_one('SELECT id FROM ' . $table . ' WHERE ' . $column . ' = ? AND user_id <> ?', [$code, $userId])) {
+        throw new DomainException('mã ' . $code . ' đã thuộc tài khoản khác');
+    }
+}
+
 // Nhập/cập nhật tài khoản hàng loạt. Đã có (trùng email hoặc tên đăng nhập) thì cập nhật hồ sơ (GPA, tín chỉ, lớp... từ hệ thống đào tạo); chưa có thì tạo mới.
 function import_users(array $rows): array
 {
@@ -368,8 +376,12 @@ function import_users(array $rows): array
             $gpa = ($row['gpa'] ?? '') !== '' ? max(0.0, min(4.0, (float) str_replace(',', '.', $row['gpa']))) : null;
             $credits = ($row['credits'] ?? '') !== '' ? max(0, (int) $row['credits']) : null;
             database_transaction(static function (PDO $connection) use ($row, $role, $email, $code, $username, $gpa, $credits, &$isNew): void {
-                $existing = page_one('SELECT id, role FROM users WHERE email = ? OR username = ? LIMIT 1', [$email, $username]);
+                $existing = page_one('SELECT id, role, email FROM users WHERE email = ? OR username = ? LIMIT 1', [$email, $username]);
                 if ($existing) {
+                    // Tên đăng nhập mặc định là mã: khớp theo mã mà khác email nghĩa là mã của người khác, không phải cùng tài khoản.
+                    if (($row['username'] ?? '') === '' && strcasecmp((string) $existing['email'], $email) !== 0) {
+                        throw new DomainException('mã ' . $username . ' đã thuộc tài khoản khác');
+                    }
                     if ($existing['role'] !== $role) {
                         throw new DomainException('tài khoản đã tồn tại với vai trò khác');
                     }
@@ -393,16 +405,19 @@ function import_users(array $rows): array
                     if ($code !== '') {
                         // Ngành và khoa suy ra từ mã sinh viên, không lấy theo cột trong tệp.
                         $major = student_code_major($code);
+                        import_require_free_code('students', 'student_code', $code, $userId);
                         $row['major'] = $major['name'];
                         $row['faculty'] = $major['faculty'];
-                        $row['training_system'] = ($row['training_system'] ?? '') ?: 'Chính quy';
+                        if (!$profile && ($row['training_system'] ?? '') === '') {
+                            $row['training_system'] = 'Chính quy';
+                        }
                         if ($profile && $profile['student_code'] !== $code) {
                             $connection->prepare('UPDATE students SET student_code = ? WHERE id = ?')->execute([$code, (int) $profile['id']]);
                         }
                     }
                     $connection->prepare('INSERT INTO students (user_id, student_code, major, class_name, faculty, university, gpa, credits, training_system, skills) VALUES (?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), \'Trường Đại học Vinh\', ?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'))
                          ON DUPLICATE KEY UPDATE major = COALESCE(VALUES(major), major), class_name = COALESCE(VALUES(class_name), class_name), faculty = COALESCE(VALUES(faculty), faculty), gpa = COALESCE(VALUES(gpa), gpa), credits = COALESCE(VALUES(credits), credits), training_system = COALESCE(VALUES(training_system), training_system), skills = COALESCE(VALUES(skills), skills)')
-                        ->execute([$userId, $code ?: 'SV' . $userId, $row['major'] ?? '', $row['class_name'] ?? '', $row['faculty'] ?? '', $gpa, $credits, $row['training_system'] ?? '', $row['skills'] ?? '']);
+                        ->execute([$userId, $code ?: $profile['student_code'], $row['major'] ?? '', $row['class_name'] ?? '', $row['faculty'] ?? '', $gpa, $credits, $row['training_system'] ?? '', $row['skills'] ?? '']);
                     $studentId = (int) page_one('SELECT id FROM students WHERE user_id = ?', [$userId])['id'];
                     if (($row['specialization'] ?? '') !== '') {
                         $connection->prepare('UPDATE students SET specialization = ? WHERE id = ?')->execute([mb_substr($row['specialization'], 0, 150, 'UTF-8'), $studentId]);
@@ -419,11 +434,20 @@ function import_users(array $rows): array
                     if ($code !== '' && preg_match(LECTURER_CODE_PATTERN, $code) !== 1) {
                         throw new DomainException('mã giảng viên phải có dạng GV + 6 chữ số');
                     }
+                    $profile = page_one('SELECT id, lecturer_code FROM lecturers WHERE user_id = ?', [$userId]);
+                    $lecturerCode = $code ?: ($profile['lecturer_code'] ?? 'GV' . str_pad((string) $userId, 6, '0', STR_PAD_LEFT));
+                    import_require_free_code('lecturers', 'lecturer_code', $lecturerCode, $userId);
+                    if ($profile && $profile['lecturer_code'] !== $lecturerCode) {
+                        $connection->prepare('UPDATE lecturers SET lecturer_code = ? WHERE id = ?')->execute([$lecturerCode, (int) $profile['id']]);
+                    }
                     $connection->prepare('INSERT INTO lecturers (user_id, lecturer_code, department, faculty, max_students) VALUES (?, ?, NULLIF(?, \'\'), ?, ?) ON DUPLICATE KEY UPDATE department = COALESCE(VALUES(department), department), faculty = VALUES(faculty), max_students = VALUES(max_students)')
-                        ->execute([$userId, $code ?: 'GV' . str_pad((string) $userId, 6, '0', STR_PAD_LEFT), $row['department'] ?? '', SCHOOL_FACULTY, max(1, (int) (($row['max_students'] ?? '') ?: 8))]);
+                        ->execute([$userId, $lecturerCode, $row['department'] ?? '', SCHOOL_FACULTY, max(1, (int) (($row['max_students'] ?? '') ?: 8))]);
                 } else {
                     if (!preg_match('/^\d{10}$/', $code) && !page_one('SELECT id FROM companies WHERE user_id = ?', [$userId])) {
                         throw new DomainException('mã doanh nghiệp phải gồm 10 chữ số');
+                    }
+                    if ($code !== '') {
+                        import_require_free_code('companies', 'company_code', $code, $userId);
                     }
                     $connection->prepare('INSERT INTO companies (user_id, company_code, company_name, email, status) VALUES (?, ?, ?, ?, \'active\') ON DUPLICATE KEY UPDATE company_name = VALUES(company_name)')
                         ->execute([$userId, $code, ($row['company_name'] ?? '') ?: $row['full_name'], $email]);

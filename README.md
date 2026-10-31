@@ -104,11 +104,11 @@ Không có framework, không có bước build và hiện chưa có bộ test t�
 1. Đặt mã nguồn tại `C:\xampp\htdocs\InternTrack`.
 2. Khởi động **Apache** và **MySQL** trong XAMPP Control Panel.
 3. Vào `http://localhost/phpmyadmin`, tạo database `interntrack` với collation `utf8mb4_unicode_ci`.
-4. Import `database/interntrack.sql` (toàn bộ schema, dùng `CREATE TABLE IF NOT EXISTS` nên chạy lại không xóa dữ liệu).
-5. (Tùy chọn) Import `database/seed.sql` rồi `database/seed-thesis.sql` để có dữ liệu mẫu (đợt đồ án, đề tài, nguyện vọng, rubric) và tài khoản demo — **chỉ dùng ở máy local**.
+4. Import `database/interntrack.sql`. Tệp này gồm toàn bộ cấu trúc và dữ liệu mẫu (đợt đồ án, đề tài, nguyện vọng, rubric, tài khoản demo), **chỉ import cả tệp ở máy local**. Chạy lại không xóa dữ liệu.
+5. Cài không có dữ liệu mẫu (production): tạo database trống, bỏ qua bước 4 và chạy `C:\xampp\php\php.exe scripts\migrate.php`; script chỉ dùng phần cấu trúc phía trên dòng `-- ==== DỮ LIỆU MẪU ====`.
    - **Nâng cấp database cũ** (đã có dữ liệu từ phiên bản trước): sao lưu trước, rồi chạy `C:\xampp\php\php.exe scripts\migrate.php`. Script tự thêm bảng, cột và giá trị ENUM còn thiếu theo `database/interntrack.sql`, chạy lại nhiều lần vẫn an toàn (thêm `--database=<tên>` để chạy thử trên bản sao).
 6. Tại thư mục dự án chạy `composer install` để cài PHPMailer và dompdf (tạo tệp PDF).
-7. (Nên có) Đặt lịch chạy `scripts/cron.php` mỗi giờ: nhắc hạn, cảnh báo và sao lưu tự động hằng ngày vào `backups/` (giữ 14 bản).
+7. **(Bắt buộc)** Đặt lịch chạy `scripts/cron.php` mỗi giờ (nhắc hạn chỉ chạy qua cron, không còn chạy khi tải trang): nhắc hạn, cảnh báo và sao lưu tự động hằng ngày vào `backups/` (giữ 14 bản).
    - Windows: Task Scheduler → chương trình `C:\xampp\php\php.exe`, đối số `C:\xampp\htdocs\InternTrack\scripts\cron.php`.
    - Linux: `0 * * * * php /var/www/InternTrack/scripts/cron.php`.
 8. Tạo tệp `.env` ở thư mục gốc theo mẫu ở mục [Cấu hình](#cấu-hình-env) bên dưới rồi điền giá trị của bạn.
@@ -167,14 +167,14 @@ SYNC_API_KEY=
 
 ## Tài khoản đăng nhập
 
-Sau khi import `database/seed.sql`, có thể dùng các tài khoản demo (chỉ cho local/test):
+Sau khi import `database/interntrack.sql`, có thể dùng các tài khoản demo (chỉ cho local/test):
 
 | Vai trò      | Username   | Mật khẩu       |
 | ------------ | ---------- | -------------- |
 | Sinh viên    | `student`  | `Student@123`  |
 | Doanh nghiệp | `company`  | `Company@123`  |
 | Giảng viên   | `lecturer` | `Lecturer@123` |
-| Phòng đào tạo (quản trị, từ `seed-thesis.sql`) | `phongdaotao` | `Daotao@123` |
+| Phòng đào tạo (quản trị) | `phongdaotao` | `Daotao@123` |
 
 Tài khoản **quản trị viên không có mật khẩu mặc định**. Tạo một password hash rồi chèn vào bảng `users`:
 
@@ -187,7 +187,7 @@ INSERT INTO users (username, email, password_hash, full_name, role, status)
 VALUES ('admin', 'admin@example.com', 'HASH_VUA_TAO', 'Quản trị viên', 'admin', 'active');
 ```
 
-Quản trị viên sau đó tạo tài khoản sinh viên, giảng viên, doanh nghiệp ngay trong trang **Tài khoản**. Tên công ty, địa chỉ và tin tuyển dụng trong `seed.sql` chỉ là dữ liệu minh họa; tin chỉ hiển thị cho sinh viên khi công ty có địa chỉ và tin có địa điểm làm việc rõ ràng (công việc từ xa ghi "Từ xa").
+Quản trị viên sau đó tạo tài khoản sinh viên, giảng viên, doanh nghiệp ngay trong trang **Tài khoản**. Tên công ty, địa chỉ và tin tuyển dụng trong dữ liệu mẫu chỉ là dữ liệu minh họa; tin chỉ hiển thị cho sinh viên khi công ty có địa chỉ và tin có địa điểm làm việc rõ ràng (công việc từ xa ghi "Từ xa").
 
 ## Các tính năng AI
 
@@ -257,7 +257,7 @@ InternTrack/
 │   ├── <vai_trò>/<màn_hình>.php   # Mỗi tệp chỉ khai báo $screen rồi gọi layout chung
 │   └── layouts/                   # screen, header, sidebar, content, forms, footer, page-data, ai-insight
 ├── assets/                        # css/style.css, js/app.js, images/ (logo, favicon SVG)
-├── database/                      # interntrack.sql (schema đầy đủ), seed.sql + seed-thesis.sql (dữ liệu mẫu)
+├── database/                      # interntrack.sql (cấu trúc, rồi dữ liệu mẫu)
 ├── scripts/                       # migrate.php (nâng cấp DB cũ), cron.php (nhắc hạn + sao lưu tự động) — chỉ chạy bằng dòng lệnh
 ├── uploads/                       # Tệp người dùng tải lên (Apache chặn truy cập trực tiếp)
 ├── .env (tự tạo, không commit) · composer.json · .htaccess
@@ -274,7 +274,7 @@ InternTrack/
 
 ## Cơ sở dữ liệu
 
-`database/interntrack.sql` là schema đầy đủ (MySQL 8+), gồm:
+`database/interntrack.sql` là tệp database duy nhất: schema đầy đủ (MySQL 8+) rồi tới dữ liệu mẫu. Phần schema gồm:
 
 | Nhóm       | Bảng                                                                                          |
 | ---------- | --------------------------------------------------------------------------------------------- |
@@ -299,7 +299,7 @@ Schema đã gộp mọi migration cũ. Với database cài từ phiên bản tr�
 ## Triển khai production
 
 - Dùng **HTTPS**, mật khẩu database riêng, tài khoản DB quyền tối thiểu, cập nhật PHP/MySQL và tắt hiển thị lỗi ra trình duyệt.
-- **Không import `seed.sql` / `seed-thesis.sql`**; tạo tài khoản với mật khẩu riêng, không tái sử dụng mật khẩu local.
+- **Không import cả tệp `interntrack.sql`** vì có tài khoản demo mật khẩu công khai; tạo database trống rồi chạy `scripts/migrate.php`, sau đó tạo tài khoản với mật khẩu riêng, không tái sử dụng mật khẩu local.
 - Cấu hình `DB_*`, `MAIL_*`, `GEMINI_API_KEY` trong môi trường máy chủ, không lưu bí mật trong repository.
 - Cân nhắc thông báo/đồng ý xử lý dữ liệu khi dùng AI và gói trả phí của Gemini nếu cần cam kết riêng tư.
 - Sao lưu database và thư mục `uploads/`; kiểm tra quyền ghi của PHP trên `uploads/` và khả năng gửi email.

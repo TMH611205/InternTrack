@@ -39,8 +39,8 @@ $placementLabels = ['pending' => 'Chờ khoa duyệt', 'approved' => 'Đã duy�
                         <strong>Tuần <?= (int) $plan['week_no'] ?></strong><textarea name="goals" rows="2" maxlength="3000" aria-label="Mục tiêu"><?= screen_escape($plan['goals']) ?></textarea><textarea name="result" rows="2" maxlength="3000" placeholder="Kết quả đạt được" aria-label="Kết quả"><?= screen_escape($plan['result'] ?? '') ?></textarea><button class="button" type="submit">Lưu</button>
                     </form>
                 <?php endforeach; ?>
-                <form method="post" action="<?= screen_escape($xAction) ?>" class="x-week"><?= $csrfField ?><input type="hidden" name="action" value="weekly_plan_save"><input type="hidden" name="internship_id" value="<?= $internshipId ?>">
-                    <label>Tuần<input class="x-small-input" type="number" name="week_no" min="1" max="52" value="<?= count($internship['weekly_plans']) + 1 ?>"></label><textarea name="goals" rows="2" maxlength="3000" placeholder="Mục tiêu, công việc dự kiến của tuần" required aria-label="Mục tiêu"></textarea><button class="button button--primary" type="submit">Thêm tuần</button>
+                <form method="post" action="<?= screen_escape($xAction) ?>" class="x-week x-week--add"><?= $csrfField ?><input type="hidden" name="action" value="weekly_plan_save"><input type="hidden" name="internship_id" value="<?= $internshipId ?>">
+                    <label>Tuần<input class="x-small-input" type="number" name="week_no" min="1" max="52" value="<?= count($internship['weekly_plans']) + 1 ?>"></label><label>Mục tiêu<textarea name="goals" rows="2" maxlength="3000" placeholder="Mục tiêu, công việc dự kiến của tuần" required></textarea></label><button class="button button--primary" type="submit">Thêm tuần</button>
                 </form>
             </details>
             <details class="x-details"><summary>Xin đổi hoặc rút khỏi đơn vị thực tập</summary>

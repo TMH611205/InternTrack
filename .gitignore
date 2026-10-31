@@ -7,3 +7,8 @@
 !/uploads/**/.htaccess
 !/uploads/**/.gitkeep
 /backups/
+.claude/
+receipts/
+review-receipts/
+assets/images/receipts/
+assets/images/review-receipts/

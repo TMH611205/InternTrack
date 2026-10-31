@@ -1103,6 +1103,7 @@ p {
   white-space: nowrap;
 }
 .table-scroll {
+  position: relative;
   overflow-x: auto;
 }
 table {
@@ -2154,16 +2155,31 @@ tbody tr:hover {
     background: var(--ink);
   }
   .breadcrumb {
-    margin-right: auto;
+    flex: 1;
+    min-width: 0;
+    margin-right: 10px;
     margin-left: 12px;
   }
-  .topbar-user > span:last-child,
+  .breadcrumb > span {
+    display: none;
+  }
+  .breadcrumb strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-user > span:not(.user-avatar),
   .term-chip,
   .topbar-divider {
     display: none;
   }
   .topbar-actions {
+    flex: none;
     gap: 12px;
+  }
+  .table-scroll th,
+  .table-scroll td {
+    min-width: 96px;
   }
   .page-wrap {
     padding: 28px 20px 24px;
@@ -4758,7 +4774,7 @@ tr.is-selected {
 
 /* =====================================================================
    Giao diện tối: theo hệ điều hành, hoặc người dùng chọn (html[data-theme]).
-   Các biến --bg-*/--bd-*/--tx-* là phiên bản tối của màu viết cứng trong tệp này.
+   Các biến --bg-..., --bd-..., --tx-... là phiên bản tối của màu viết cứng trong tệp này.
    ===================================================================== */
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -5224,4 +5240,139 @@ tr.is-selected {
 .x-stack {
   display: grid;
   gap: 18px;
+}
+
+/* Thanh bên: logo, không gian và phần tài khoản ghim cố định, chỉ danh sách menu cuộn. */
+.sidebar {
+  overflow: visible;
+}
+.primary-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.sidebar-bottom {
+  flex: none;
+  margin-top: 10px;
+}
+
+/* Nút dạng liên kết và nút thường cùng chiều cao, chữ căn giữa, không bị kéo giãn trong lưới. */
+.table-edit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+.x-card-tools .inline-action,
+.x-actions-row .inline-action {
+  min-width: 0;
+}
+.x-card-tools {
+  gap: 8px;
+}
+
+/* Duyệt nhật ký: các nút cùng hàng, độ rộng cố định để các dòng thẳng cột. */
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.row-actions .inline-action {
+  min-width: 0;
+}
+.row-actions .inline-action select {
+  width: 120px;
+}
+.row-actions .inline-action button:last-of-type {
+  box-sizing: border-box;
+  width: 112px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.row-actions .table-edit-button {
+  min-width: 112px;
+}
+
+/* Nhiệm vụ: các nút cùng cỡ, thẳng hàng. */
+.task-company-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.task-company-actions .task-status-form {
+  margin-top: 0;
+}
+.task-company-actions .task-edit-trigger,
+.task-company-actions .task-status-form button {
+  box-sizing: border-box;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--bd-cad6e2, #cad6e2);
+  border-radius: 4px;
+  background: var(--bg-ffffff, #fff);
+  color: var(--green);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Thẻ vị trí: tách nút đóng nhận hồ sơ khỏi nút chỉnh sửa. */
+.task-status-form + .action-trigger {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+/* Đề cương theo tuần. */
+.x-week {
+  align-items: end;
+}
+.x-week--add {
+  grid-template-columns: 70px minmax(0, 1fr) auto;
+}
+.x-week input,
+.x-week textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-ffffff, #fff);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+/* Ô Tuần, ô nhập và nút cùng chiều cao để đáy và đỉnh thẳng hàng. */
+.x-week input,
+.x-week textarea,
+.x-week button {
+  box-sizing: border-box;
+  min-height: 58px;
+}
+.x-week input {
+  height: 58px;
+  text-align: center;
+}
+.x-week button {
+  height: 58px;
+  min-width: 104px;
+  white-space: nowrap;
+}
+.x-week > strong {
+  align-self: center;
+}
+@media (max-width: 620px) {
+  .x-week,
+  .x-week--add {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

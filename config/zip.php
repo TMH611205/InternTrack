@@ -28,6 +28,64 @@ function zip_build(array $files): string
     return $data . $directory . pack('VvvvvVVv', 0x06054b50, 0, 0, $count, $count, strlen($directory), strlen($data), 0);
 }
 
+// Ghi ZIP thẳng ra đĩa, từng tệp một, để sao lưu lớn không cần giữ trong RAM.
+// shortcut: không có ZIP64 nên báo lỗi khi vượt 4 GB; khi đó dùng mysqldump và công cụ nén ngoài.
+function zip_stream_open(string $path): array
+{
+    $handle = fopen($path, 'wb');
+    if ($handle === false) {
+        throw new RuntimeException('Không tạo được tệp nén.');
+    }
+    return ['handle' => $handle, 'directory' => fopen('php://temp', 'w+b'), 'directory_size' => 0, 'count' => 0];
+}
+
+function zip_stream_add(array &$zip, string $name, string $sourcePath): void
+{
+    $source = fopen($sourcePath, 'rb');
+    if ($source === false) {
+        throw new RuntimeException('Không đọc được tệp "' . $name . '".');
+    }
+    $handle = $zip['handle'];
+    $offset = (int) ftell($handle);
+    $size = (int) filesize($sourcePath);
+    $crc = (int) hexdec((string) hash_file('crc32b', $sourcePath));
+    $deflate = function_exists('deflate_init') ? deflate_init(ZLIB_ENCODING_RAW, ['level' => 6]) : false;
+    $method = $deflate !== false ? 8 : 0;
+    [$time, $date] = zip_dos_time(time());
+    $header = static fn(int $stored) => pack('VvvvvvVVVvv', 0x04034b50, 20, 0x0800, $method, $time, $date, $crc, $stored, $size, strlen($name), 0) . $name;
+    fwrite($handle, $header(0));
+    $stored = 0;
+    while (!feof($source)) {
+        $chunk = (string) fread($source, 1048576);
+        $bytes = $deflate !== false ? deflate_add($deflate, $chunk, ZLIB_NO_FLUSH) : $chunk;
+        $stored += (int) fwrite($handle, $bytes);
+    }
+    fclose($source);
+    if ($deflate !== false) {
+        $stored += (int) fwrite($handle, deflate_add($deflate, '', ZLIB_FINISH));
+    }
+    $end = (int) ftell($handle);
+    if ($end >= 0xFFFFFFFF || $size >= 0xFFFFFFFF) {
+        throw new RuntimeException('Bản sao lưu vượt 4 GB, không ghi được bằng định dạng ZIP hiện tại.');
+    }
+    fseek($handle, $offset);
+    fwrite($handle, $header($stored));
+    fseek($handle, $end);
+    $zip['directory_size'] += (int) fwrite($zip['directory'], pack('VvvvvvvVVVvvvvvVV', 0x02014b50, 20, 20, 0x0800, $method, $time, $date, $crc, $stored, $size, strlen($name), 0, 0, 0, 0, 0, $offset) . $name);
+    $zip['count']++;
+}
+
+function zip_stream_close(array $zip): void
+{
+    $handle = $zip['handle'];
+    $offset = (int) ftell($handle);
+    rewind($zip['directory']);
+    stream_copy_to_stream($zip['directory'], $handle);
+    fwrite($handle, pack('VvvvvVVv', 0x06054b50, 0, 0, $zip['count'], $zip['count'], $zip['directory_size'], $offset, 0));
+    fclose($zip['directory']);
+    fclose($handle);
+}
+
 function zip_dos_time(int $timestamp): array
 {
     $parts = getdate($timestamp);

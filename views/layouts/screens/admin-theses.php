@@ -97,7 +97,7 @@ $councilForm = static function (?array $council, array $members) use ($batch, $x
     <section class="panel table-panel">
         <div class="table-toolbar"><div><p class="eyebrow">Hạn mức hướng dẫn mỗi đợt · trưởng bộ môn duyệt đề tài của bộ môn</p><h2>Tải giảng viên</h2></div></div>
         <div class="table-scroll"><table class="x-compact">
-            <thead><tr><th>Giảng viên</th><th>Hướng dẫn</th><th>Phản biện</th><th>Hạn mức HD (đợt) · PB · vai trò</th></tr></thead>
+            <thead><tr><th style="min-width: 200px">Giảng viên</th><th>Hướng dẫn</th><th>Phản biện</th><th>Hạn mức HD (đợt) · PB · vai trò</th></tr></thead>
             <tbody><?php foreach ($screenData['lecturers'] as $lecturer): $lecturerId = (int) $lecturer['id']; $load = (int) ($screenData['load'][$lecturerId] ?? 0); ?>
                 <tr><td><?= screen_escape($lecturer['full_name']) ?><br><small class="x-meta"><?= screen_escape(mb_strimwidth((string) $lecturer['research_areas'], 0, 70, '…', 'UTF-8')) ?></small></td>
                     <?php $quota = (int) ($screenData['quotas'][$lecturerId] ?? $lecturer['max_students']); $reviews = (int) ($screenData['review_load'][$lecturerId] ?? 0); ?><td><?= $load ?>/<?= $quota ?><?= $load > $quota ? ' ' . x_badge('Vượt hạn mức', 'badge--attention') : '' ?></td><td><?= $reviews ?>/<?= (int) $lecturer['max_reviews'] ?><?= $reviews > (int) $lecturer['max_reviews'] ? ' ' . x_badge('Quá tải', 'badge--attention') : '' ?></td>

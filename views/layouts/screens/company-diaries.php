@@ -19,13 +19,12 @@ $showAll = $screenData['show_all'];
                 } ?>
             </div>
             <p class="x-text"><?= screen_escape($diary['content']) ?></p>
-            <?= comment_thread_dialog('diary', $diaryId, $screenData['comments'][$diaryId] ?? [], [], $xAction, $csrfField, $diary['student_name'] . ' · ' . page_date($diary['diary_date'])) ?>
             <?php if ($diary['company_note']): ?><p class="x-meta">Ghi chú của đơn vị: <?= screen_escape($diary['company_note']) ?></p><?php endif; ?>
+            <div class="x-card-tools">
+                <?= comment_thread_dialog('diary', $diaryId, $screenData['comments'][$diaryId] ?? [], [], $xAction, $csrfField, $diary['student_name'] . ' · ' . page_date($diary['diary_date'])) ?>
             <?php if (!$diary['locked']): ?>
-                <div class="x-card-tools">
                     <?php if ($diary['company_status'] !== 'confirmed'): ?><?= $xPost('diary_confirm', ['diary_id' => $diaryId, 'decision' => 'confirm'], 'Xác nhận', 'inline-action', null, 'x-strong') ?><?php endif; ?>
                     <button type="button" class="table-edit-button" data-dialog-open="diary-note-<?= $diaryId ?>">Ghi chú chưa đúng</button>
-                </div>
                 <dialog class="modal" id="diary-note-<?= $diaryId ?>" aria-label="Ghi chú nhật ký">
                     <form method="post" action="<?= screen_escape($xAction) ?>" class="workspace-form modal-form"><?= $csrfField ?><input type="hidden" name="action" value="diary_confirm"><input type="hidden" name="diary_id" value="<?= $diaryId ?>"><input type="hidden" name="decision" value="flag">
                         <header class="modal-head"><div><p class="eyebrow">Nhật ký ngày <?= page_date($diary['diary_date']) ?></p><h2><?= screen_escape($diary['student_name']) ?></h2><p class="modal-sub">Sinh viên và giảng viên theo dõi sẽ nhận được ghi chú này.</p></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
@@ -34,6 +33,7 @@ $showAll = $screenData['show_all'];
                     </form>
                 </dialog>
             <?php endif; ?>
+            </div>
         </article>
     <?php endforeach; ?>
     <?php if (!$screenData['diaries']): ?><?= x_empty($showAll ? 'Thực tập sinh chưa gửi nhật ký nào.' : 'Không có nhật ký nào chờ xác nhận.') ?><?php endif; ?>

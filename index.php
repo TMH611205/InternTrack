@@ -154,13 +154,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'login') {
             $identifier = is_string($_POST['login'] ?? null) ? $_POST['login'] : '';
             $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
+            if (login_is_throttled($identifier)) {
+                app_set_flash('error', 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.');
+                app_redirect('auth/login');
+            }
             if (authenticate_user($identifier, $password)) {
+                login_clear_failures($identifier);
                 $user = authenticated_user();
                 require_once __DIR__ . '/controllers/ActionController.php';
                 audit_record('login', [], $user);
                 app_set_flash('success', 'Đăng nhập thành công.');
                 app_redirect($user['role'] . '/dashboard');
             }
+            login_record_failure($identifier);
             app_set_flash('error', 'Thông tin đăng nhập không đúng hoặc tài khoản chưa được kích hoạt.');
             app_redirect('auth/login');
         }
@@ -185,14 +191,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 error_log('InternTrack password reset OTP could not be sent; configure Gmail SMTP environment variables.');
             }
             unset($_SESSION['password_reset_authorized'], $_SESSION['password_reset_email']);
-            if ($sent) {
-                $_SESSION['password_reset_email'] = $reset['email'];
-                $_SESSION['password_reset_otp_sent_at'] = time();
-                app_set_flash('success', 'Mã OTP đã được gửi. Nhập mã gồm 6 chữ số để tiếp tục; hãy kiểm tra cả thư mục Spam.');
-                app_redirect('auth/reset-password');
+            if (!filter_var(trim($email), FILTER_VALIDATE_EMAIL)) {
+                throw new DomainException('Email không hợp lệ.');
             }
-            app_set_flash('success', 'Nếu email thuộc tài khoản đang hoạt động, hướng dẫn sẽ được gửi. Hãy kiểm tra hộp thư và thử lại sau ít phút nếu chưa nhận được.');
-            app_redirect('auth/forgot-password');
+            // Email có hay không trong hệ thống đều đi cùng một đường để không lộ tài khoản nào tồn tại.
+            $_SESSION['password_reset_email'] = trim($email);
+            $_SESSION['password_reset_otp_sent_at'] = time();
+            app_set_flash('success', 'Nếu email thuộc tài khoản đang hoạt động, mã OTP gồm 6 chữ số đã được gửi. Hãy kiểm tra cả thư mục Spam.');
+            app_redirect('auth/reset-password');
         }
 
         if ($action === 'password_reset_resend') {
@@ -202,21 +208,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $reset = create_password_reset_otp($email);
-            if ($reset === null) {
-                app_set_flash('error', 'Bạn vừa yêu cầu mã OTP. Vui lòng đợi đủ 60 giây rồi thử gửi lại.');
-                app_redirect('auth/reset-password');
-            }
-
-            $sent = app_send_password_reset_otp($reset['email'], $reset['otp']);
-            $_SESSION['password_reset_otp_sent_at'] = time();
-            if (!$sent) {
+            if ($reset !== null && !app_send_password_reset_otp($reset['email'], $reset['otp'])) {
                 invalidate_password_reset_otp($reset['otp']);
                 error_log('InternTrack password reset OTP could not be resent; configure Gmail SMTP environment variables.');
-                app_set_flash('error', 'Không gửi được mã OTP. Vui lòng thử lại sau 60 giây.');
-                app_redirect('auth/reset-password');
             }
-
-            app_set_flash('success', 'Mã OTP mới đã được gửi. Hãy kiểm tra hộp thư và thư mục Spam.');
+            $_SESSION['password_reset_otp_sent_at'] = time();
+            app_set_flash('success', 'Nếu email hợp lệ và đã qua 60 giây từ lần gửi trước, mã OTP mới đã được gửi. Hãy kiểm tra hộp thư và thư mục Spam.');
             app_redirect('auth/reset-password');
         }
 
@@ -233,7 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['password_reset_authorized'] = [
                 'user_id' => $verified['user_id'],
                 'otp_id' => $verified['otp_id'],
-                'expires_at' => time() + 60,
+                'expires_at' => time() + 300,
             ];
             unset($_SESSION['password_reset_email']);
             app_set_flash('success', 'Mã OTP hợp lệ. Hãy tạo mật khẩu mới.');

@@ -153,6 +153,8 @@ function reminders_run_daily(): void
         }
     } catch (Throwable $error) {
         error_log('InternTrack reminders failed: ' . $error->getMessage());
+        // Trả lại lượt để lần cron sau chạy lại; thà nhắc trùng còn hơn mất nhắc hạn cả ngày.
+        database()->prepare('UPDATE app_settings SET setting_value = \'\' WHERE setting_key = \'reminders_last_run\'')->execute();
     }
 }
 
@@ -592,38 +594,60 @@ function export_score(mixed $value): string
     return $value === null ? '' : number_format((float) $value, 2, ',', '');
 }
 
-// Sao lưu toàn bộ bảng dữ liệu thành tệp SQL (DROP + CREATE + INSERT). View được tạo lại bằng database/interntrack.sql.
-function backup_sql(): string
+// Ghi toàn bộ bảng ra tệp SQL theo từng dòng (DROP + CREATE + INSERT), không giữ dữ liệu trong RAM. View được tạo lại bằng database/interntrack.sql.
+function backup_sql_write(string $path): void
 {
     $connection = database();
-    $sql = "-- Sao lưu InternTrack · Trường Đại học Vinh · " . date('Y-m-d H:i:s') . "\nSET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS = 0;\n";
-    foreach ($connection->query('SHOW FULL TABLES WHERE Table_type = \'BASE TABLE\'')->fetchAll(PDO::FETCH_NUM) as [$table]) {
-        $create = $connection->query('SHOW CREATE TABLE `' . str_replace('`', '', $table) . '`')->fetch(PDO::FETCH_NUM)[1];
-        $sql .= "\nDROP TABLE IF EXISTS `" . $table . "`;\n" . $create . ";\n";
-        $statement = $connection->query('SELECT * FROM `' . str_replace('`', '', $table) . '`');
-        while ($row = $statement->fetch(PDO::FETCH_NUM)) {
-            $sql .= 'INSERT INTO `' . $table . '` VALUES (' . implode(',', array_map(static fn($value) => $value === null ? 'NULL' : $connection->quote((string) $value), $row)) . ");\n";
+    $out = fopen($path, 'wb');
+    if ($out === false) {
+        throw new RuntimeException('Không tạo được tệp sao lưu tạm.');
+    }
+    fwrite($out, "-- Sao lưu InternTrack · Trường Đại học Vinh · " . date('Y-m-d H:i:s') . "\nSET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS = 0;\n");
+    $tables = $connection->query('SHOW FULL TABLES WHERE Table_type = \'BASE TABLE\'')->fetchAll(PDO::FETCH_NUM);
+    foreach ($tables as [$table]) {
+        $name = str_replace('`', '', $table);
+        $create = $connection->query('SHOW CREATE TABLE `' . $name . '`')->fetch(PDO::FETCH_NUM)[1];
+        fwrite($out, "\nDROP TABLE IF EXISTS `" . $table . "`;\n" . $create . ";\n");
+        $connection->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+        try {
+            $statement = $connection->query('SELECT * FROM `' . $name . '`');
+            while ($row = $statement->fetch(PDO::FETCH_NUM)) {
+                fwrite($out, 'INSERT INTO `' . $table . '` VALUES (' . implode(',', array_map(static fn($value) => $value === null ? 'NULL' : $connection->quote((string) $value), $row)) . ");\n");
+            }
+            $statement->closeCursor();
+        } finally {
+            $connection->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
         }
     }
-    return $sql . "\nSET FOREIGN_KEY_CHECKS = 1;\n";
+    fwrite($out, "\nSET FOREIGN_KEY_CHECKS = 1;\n");
+    fclose($out);
 }
 
-// Bản sao lưu đầy đủ: database.sql + toàn bộ tệp trong uploads/ (CV, báo cáo, bài nộp, giấy tờ...).
-function backup_zip(): string
+// Bản sao lưu đầy đủ ghi thẳng ra $path: database.sql + toàn bộ tệp trong uploads/ (CV, báo cáo, bài nộp, giấy tờ...).
+function backup_zip_write(string $path): void
 {
-    $files = ['database.sql' => backup_sql()];
-    $root = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads';
-    if (is_dir($root)) {
-        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $file) {
-            if ($file->isFile() && $file->getFilename() !== '.htaccess') {
-                $files['uploads/' . str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1))] = (string) file_get_contents($file->getPathname());
+    $sqlPath = (string) tempnam(sys_get_temp_dir(), 'itsql');
+    $zip = zip_stream_open($path);
+    try {
+        backup_sql_write($sqlPath);
+        zip_stream_add($zip, 'database.sql', $sqlPath);
+        $root = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads';
+        if (is_dir($root)) {
+            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $file) {
+                if ($file->isFile() && $file->getFilename() !== '.htaccess') {
+                    zip_stream_add($zip, 'uploads/' . str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1)), $file->getPathname());
+                }
             }
         }
+        zip_stream_close($zip);
+    } finally {
+        if (is_file($sqlPath)) {
+            unlink($sqlPath);
+        }
     }
-    return zip_build($files);
 }
 
-// Sao lưu tự động (scripts/cron.php): lưu vào backups/ và giữ lại $keep bản mới nhất.
+// Sao lưu tự động (scripts/cron.php): lưu vào backups/ và giữ lại $keep bản mới nhất. Ghi ra tệp tạm rồi đổi tên để không có bản dở dang.
 function backup_store(int $keep = 14): string
 {
     $directory = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backups';
@@ -632,7 +656,14 @@ function backup_store(int $keep = 14): string
         file_put_contents($directory . DIRECTORY_SEPARATOR . '.htaccess', "Require all denied\n");
     }
     $path = $directory . DIRECTORY_SEPARATOR . 'interntrack-' . date('Ymd-His') . '.zip';
-    file_put_contents($path, backup_zip());
+    try {
+        backup_zip_write($path . '.tmp');
+        rename($path . '.tmp', $path);
+    } finally {
+        if (is_file($path . '.tmp')) {
+            unlink($path . '.tmp');
+        }
+    }
     $old = glob($directory . DIRECTORY_SEPARATOR . 'interntrack-*.zip') ?: [];
     rsort($old);
     foreach (array_slice($old, $keep) as $stale) {
@@ -641,13 +672,29 @@ function backup_store(int $keep = 14): string
     return $path;
 }
 
+function backup_require_signature(string $sql): void
+{
+    if (!str_starts_with($sql, '-- Sao lưu InternTrack')) {
+        throw new DomainException('Tệp không phải bản sao lưu do hệ thống tạo ra.');
+    }
+}
+
 function export_backup(): never
 {
-    $content = backup_zip();
-    header('Content-Type: application/zip');
-    header('Content-Disposition: attachment; filename="interntrack-backup-' . date('Ymd-His') . '.zip"');
-    header('Content-Length: ' . strlen($content));
-    echo $content;
+    set_time_limit(0);
+    $path = (string) tempnam(sys_get_temp_dir(), 'itzip');
+    try {
+        backup_zip_write($path);
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="interntrack-backup-' . date('Ymd-His') . '.zip"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+    } finally {
+        unlink($path);
+    }
     exit;
 }
 
@@ -664,12 +711,12 @@ function serve_export(string $type, array $user): never
 
     switch ($type) {
         case 'backup':
-            $isAdmin || $deny();
+            ($isAdmin && empty($user['scope_faculty'])) || $deny();
             audit_record('backup_download', [], $user);
             export_backup();
 
         case 'users':
-            $isAdmin || $deny();
+            ($isAdmin && empty($user['scope_faculty'])) || $deny();
             $rows = page_all('SELECT u.username, u.email, u.full_name, u.phone, u.role, u.status, COALESCE(s.student_code, l.lecturer_code, c.company_code) AS code, s.major, s.class_name, s.gpa, s.credits, l.department, c.company_name FROM users u LEFT JOIN students s ON s.user_id = u.id LEFT JOIN lecturers l ON l.user_id = u.id LEFT JOIN companies c ON c.user_id = u.id ORDER BY u.role, u.full_name');
             export_csv('tai-khoan', ['role', 'username', 'email', 'full_name', 'phone', 'status', 'code', 'major', 'class_name', 'gpa', 'credits', 'department', 'company_name'], array_map(static fn($row) => [$row['role'], $row['username'], $row['email'], $row['full_name'], $row['phone'], $row['status'], $row['code'], $row['major'], $row['class_name'], $row['gpa'], $row['credits'], $row['department'], $row['company_name']], $rows));
 
@@ -765,7 +812,7 @@ function serve_export(string $type, array $user): never
             export_csv('thong-ke-cac-dot', ['Đợt', 'Loại', 'Năm học', 'Trạng thái', 'Đề tài', 'Sinh viên được ghép', 'Tỷ lệ NV1 (%)', 'Điểm TB', 'Tỷ lệ đạt (%)', 'Bài nộp trễ'], array_map(static fn($row) => [$row['name'], $row['batch_type'] === 'thesis' ? 'Đồ án' : 'Thực tập', $row['school_year'], $row['status'], $row['topics'], $row['students'], $row['first_rate'], $row['average'], $row['pass_rate'], $row['late']], statistics_batches()));
 
         case 'audit':
-            $isAdmin || $deny();
+            ($isAdmin && empty($user['scope_faculty'])) || $deny();
             $rows = page_all('SELECT a.created_at, u.full_name, a.role, a.action, a.target, a.details, a.ip_address FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT 20000');
             export_csv('nhat-ky-he-thong', ['Thời điểm', 'Người thực hiện', 'Vai trò', 'Thao tác', 'Đối tượng', 'Chi tiết', 'IP'], array_map('array_values', $rows));
 
@@ -1176,6 +1223,8 @@ function admin_tools_handle_action(string $action, array $input, array $files): 
             if ($extension === 'zip') {
                 $archive = zip_read((string) $file['tmp_name']);
                 $content = (string) ($archive['database.sql'] ?? '');
+                backup_require_signature($content);
+                backup_store();
                 $uploadRoot = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads';
                 foreach ($archive as $name => $data) {
                     // Chỉ ghi lại tệp trong uploads/, tên an toàn (không có "..", không phải tệp thực thi).
@@ -1193,9 +1242,8 @@ function admin_tools_handle_action(string $action, array $input, array $files): 
                 }
             } else {
                 $content = (string) file_get_contents((string) $file['tmp_name']);
-            }
-            if (!str_starts_with($content, '-- Sao lưu InternTrack')) {
-                throw new DomainException('Tệp không phải bản sao lưu do hệ thống tạo ra.');
+                backup_require_signature($content);
+                backup_store();
             }
             $statements = preg_split('/;\s*\n/', $content) ?: [];
             $executed = 0;

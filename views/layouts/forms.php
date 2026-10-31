@@ -91,7 +91,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
         <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
                 <header class="modal-head"><div><p class="eyebrow">Lưu nháp hoặc gửi giảng viên duyệt</p><h2>Ghi nhật ký</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
             <?= $csrfField ?><input type="hidden" name="action" value="diary_save"><input type="hidden" name="internship_id" value="<?= (int) $screenData['internship_id'] ?>">
-            <div class="form-grid"><label>Ngày thực tập<input name="diary_date" type="date" value="<?= date('Y-m-d') ?>" required></label><label>Số giờ<input name="hours_worked" type="number" min="0" max="24" step="0.5" value="8" required></label></div>
+            <div class="form-grid"><label>Ngày thực tập<input name="diary_date" type="date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></label><label>Số giờ<input name="hours_worked" type="number" min="0" max="24" step="0.5" value="8" required></label></div>
             <label>Tiêu đề<input name="title" maxlength="200" required></label>
             <label>Nội dung<textarea name="content" rows="4" maxlength="10000" required></textarea></label>
             <label>Trạng thái<select name="status">
@@ -108,7 +108,7 @@ $formAction = '?page=' . rawurlencode($screen) . ($screen === 'admin/users' && !
     <?php // [Sinh viên · Báo cáo] Tạo báo cáo (đề cương, giữa kỳ, cuối kỳ). ?>
     <button type="button" class="action-trigger" data-dialog-open="form-modal-4"><span>+ Tạo báo cáo</span><small>Đề cương, giữa kỳ hoặc cuối kỳ</small></button>
     <dialog class="modal" id="form-modal-4" aria-label="Tạo báo cáo">
-        <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
+        <form method="post" enctype="multipart/form-data" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form">
                 <header class="modal-head"><div><p class="eyebrow">Đề cương, giữa kỳ hoặc cuối kỳ</p><h2>Tạo báo cáo</h2></div><button type="button" class="modal-close" data-dialog-close aria-label="Đóng">&times;</button></header>
             <?= $csrfField ?><input type="hidden" name="action" value="report_save"><input type="hidden" name="internship_id" value="<?= (int) $screenData['internship_id'] ?>">
             <div class="form-grid"><label>Loại báo cáo<select name="report_type">

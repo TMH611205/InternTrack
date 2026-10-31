@@ -611,8 +611,8 @@ function matching_run(int $batchId, string $algorithm, array $params, int $userI
 function matching_publish(int $runId): int
 {
     $run = page_one('SELECT * FROM matching_runs WHERE id = ?', [$runId]);
-    if (!$run || $run['status'] === 'discarded') {
-        throw new DomainException('Không tìm thấy lần chạy ghép cặp.');
+    if (!$run || $run['status'] !== 'preview') {
+        throw new DomainException('Chỉ công bố được lần chạy thử chưa công bố.');
     }
     $params = json_decode((string) $run['params'], true) ?: [];
     $result = json_decode((string) $run['result'], true) ?: [];
@@ -623,6 +623,14 @@ function matching_publish(int $runId): int
     $inserted = 0;
     $notices = [];
     database_transaction(static function (PDO $connection) use ($run, $params, $result, $topics, &$inserted, &$notices): void {
+        // Đồ án đã khóa / đã xác nhận không bao giờ bị ghi đè; đổi sau khi chạy thử thì kết quả đã cũ (sức chứa đã khác).
+        $fixedStudents = [];
+        foreach (page_all('SELECT student_id, updated_at FROM theses WHERE batch_id = ? AND (locked = 1 OR status IN (\'confirmed\', \'in_progress\', \'completed\')) FOR UPDATE', [(int) $run['batch_id']]) as $fixed) {
+            if ($fixed['updated_at'] > $run['created_at']) {
+                throw new DomainException('Có đồ án đã được xác nhận hoặc khóa sau lần chạy này. Hãy chạy thử lại trước khi công bố.');
+            }
+            $fixedStudents[(int) $fixed['student_id']] = true;
+        }
         $connection->prepare(
             'DELETE FROM theses WHERE batch_id = ? AND locked = 0 AND ' . (!empty($params['keep_existing']) ? 'status = \'declined\'' : 'status IN (\'assigned\', \'declined\')')
         )->execute([(int) $run['batch_id']]);
@@ -636,6 +644,9 @@ function matching_publish(int $runId): int
             }
             $groupId = str_starts_with((string) $row['key'], 'g') ? (int) substr((string) $row['key'], 1) : null;
             foreach ($row['student_ids'] as $studentId) {
+                if (isset($fixedStudents[(int) $studentId])) {
+                    continue;
+                }
                 $insert->execute([(int) $run['batch_id'], (int) $studentId, (int) $row['topic_id'], $groupId, $topics[(int) $row['topic_id']]['lecturer_id'], $row['rank']]);
                 $inserted++;
                 $notices[] = [(int) $studentId, $topics[(int) $row['topic_id']]['title']];

@@ -26,6 +26,42 @@ function authenticate_user(string $identifier, string $password): bool
     return true;
 }
 
+// Giới hạn đăng nhập sai: 10 lần cho một tài khoản + IP, 50 lần cho một IP, trong 15 phút.
+// Đếm theo cặp tài khoản + IP để người ngoài không khóa được tài khoản của người khác.
+function login_attempt_keys(string $identifier): array
+{
+    $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    return ['account' => hash('sha256', mb_strtolower(trim($identifier), 'UTF-8') . '|' . $ip), 'ip' => hash('sha256', '|' . $ip)];
+}
+
+function login_is_throttled(string $identifier): bool
+{
+    $keys = login_attempt_keys($identifier);
+    $count = database()->prepare('SELECT COUNT(*) FROM login_attempts WHERE key_hash = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)');
+    foreach ([['account', 10], ['ip', 50]] as [$type, $limit]) {
+        $count->execute([$keys[$type]]);
+        if ((int) $count->fetchColumn() >= $limit) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function login_record_failure(string $identifier): void
+{
+    $connection = database();
+    $connection->exec('DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL 1 DAY)');
+    $insert = $connection->prepare('INSERT INTO login_attempts (key_hash) VALUES (?)');
+    foreach (login_attempt_keys($identifier) as $key) {
+        $insert->execute([$key]);
+    }
+}
+
+function login_clear_failures(string $identifier): void
+{
+    database()->prepare('DELETE FROM login_attempts WHERE key_hash = ?')->execute([login_attempt_keys($identifier)['account']]);
+}
+
 // Tạo mã OTP cho chức năng quên mật khẩu.
 // Chỉ cho phép tạo mới nếu tài khoản tồn tại, đang active và chưa gửi OTP trong 60 giây gần đây.
 function create_password_reset_otp(string $email): ?array
@@ -94,7 +130,7 @@ function verify_password_reset_otp(string $email, string $otp): ?array
             return null;
         }
 
-        $connection->prepare('UPDATE password_reset_otps SET verified_at = NOW() WHERE id = ?')->execute([$reset['id']]);
+        $connection->prepare('UPDATE password_reset_otps SET verified_at = NOW(), expires_at = DATE_ADD(NOW(), INTERVAL 5 MINUTE) WHERE id = ?')->execute([$reset['id']]);
         $connection->commit();
         return ['otp_id' => (int) $reset['id'], 'user_id' => (int) $reset['user_id']];
     } catch (Throwable $error) {

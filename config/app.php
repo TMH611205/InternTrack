@@ -155,8 +155,10 @@ function app_env(string $key, mixed $default = null): mixed
                     $value = substr($value, 1, -1);
                 }
                 $values[$name] = $value;
-                $_ENV[$name] = $value;
-                putenv($name . '=' . $value);
+                // Biến môi trường thật được ưu tiên hơn .env.
+                if (getenv($name) === false) {
+                    putenv($name . '=' . $value);
+                }
             }
         }
         $loaded = true;

@@ -61,7 +61,7 @@ $stateClass = static fn(string $state) => ['open' => 'badge--active', 'not_start
                     <?php foreach ($thesis['scores'] as $score): ?><tr><td><?= screen_escape(THESIS_ROLE_LABELS[$score['evaluator_role']] ?? '') ?></td><td><?= round((float) $score['total'], 2) ?></td><td><?= nl2br(screen_escape((string) $score['comments'])) ?></td></tr><?php endforeach; ?>
                 </tbody></table></div>
                 <?php foreach ($thesis['regrades'] as $request): ?><p class="x-meta">Phúc khảo <?= screen_escape(thesis_datetime_label($request['created_at'])) ?>: <?= x_badge(['pending' => 'Chờ xử lý', 'accepted' => 'Được chấp nhận', 'rejected' => 'Bị từ chối'][$request['status']]) ?> <?= screen_escape((string) $request['response']) ?></p><?php endforeach; ?>
-                <?php if (empty($batch['locked_at']) && !in_array('pending', array_column($thesis['regrades'], 'status'), true)): ?>
+                <?php if (empty($batch['locked_at']) && ($thesis['final_score'] ?? null) !== null && !in_array('pending', array_column($thesis['regrades'], 'status'), true)): ?>
                     <form method="post" action="<?= screen_escape($xAction) ?>" class="x-inline-form"><?= $csrfField ?><input type="hidden" name="action" value="regrade_request"><input type="hidden" name="thesis_id" value="<?= (int) $thesis['id'] ?>"><input name="reason" maxlength="3000" minlength="20" placeholder="Lý do đề nghị phúc khảo (trong 14 ngày kể từ khi công bố)" required><button class="button" type="submit">Gửi yêu cầu phúc khảo</button></form>
                 <?php endif; ?>
             </section>

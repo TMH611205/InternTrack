@@ -1934,6 +1934,9 @@ function thesis_handle_action(string $action, array $input, array $files): ?arra
                 $complete++;
                 $students[] = (int) $thesis['user_id'];
             }
+            if ($complete === 0) {
+                throw new DomainException('Chưa có đồ án nào đủ phiếu chấm nên chưa thể công bố điểm.');
+            }
             $connection->prepare('UPDATE batches SET results_published_at = NOW() WHERE id = ?')->execute([(int) $batch['id']]);
             foreach ($students as $studentUserId) {
                 notify_user($studentUserId, 'thesis', 'Đã có điểm đồ án', 'Kết quả ' . $batch['name'] . ' đã được công bố.', 'student/thesis&batch=' . (int) $batch['id'], true);
@@ -1946,6 +1949,9 @@ function thesis_handle_action(string $action, array $input, array $files): ?arra
             $thesis = page_one('SELECT th.*, b.results_published_at, b.locked_at FROM theses th JOIN batches b ON b.id = th.batch_id WHERE th.id = ? AND th.student_id = ?', [thesis_int($input, 'thesis_id'), (int) $user['student_id']]);
             if (!$thesis || !$thesis['results_published_at']) {
                 throw new DomainException('Chỉ yêu cầu phúc khảo sau khi điểm được công bố.');
+            }
+            if ($thesis['final_score'] === null) {
+                throw new DomainException('Đồ án của bạn chưa có điểm tổng kết nên chưa thể phúc khảo.');
             }
             batch_require_unlocked($thesis);
             if (time() - strtotime((string) $thesis['results_published_at']) > 14 * 86400) {

@@ -279,12 +279,14 @@ $primaryAction = $primaryActions[$screen] ?? null;
                                             </dialog>
                                         <?php endif; ?>
                                     <?php elseif ($screen === 'lecturer/diaries' && $recordId): ?>
+                                        <div class="row-actions">
                                         <?= comment_thread_dialog('diary', (int) $recordId, $screenData['row_comments'][$rowIndex] ?? [], [], $formAction, $csrfField, $row[0] . ' · ' . $row[2]) ?>
                                         <?php // Giảng viên · Nhật ký: duyệt hoặc yêu cầu sửa, kèm hộp thoại AI tóm tắt và chấm sơ bộ. ?>
                                         <form method="post" action="<?= screen_escape($formAction) ?>" class="inline-action"><?= $csrfField ?><input type="hidden" name="action" value="diary_review"><input type="hidden" name="diary_id" value="<?= (int) $recordId ?>"><select name="status" aria-label="Kết quả duyệt">
                                                 <option value="approved">Duyệt</option>
                                                 <option value="rejected">Yêu cầu sửa</option>
                                             </select><button type="submit">Lưu</button><?php $insight = $screenData['row_insights'][$rowIndex] ?? null; ?><?php if (ai_match_enabled()): ?><?php // Nút AI cùng hàng với Lưu; hộp thoại AI nằm ngoài form vì có form riêng. ?><button type="button" class="table-edit-button ai-button<?= ai_review_has_problem($insight) ? ' ai-button--warn' : '' ?>" data-dialog-open="ai-diary-<?= (int) $recordId ?>"><?= $insight ? 'AI · ' . (int) $insight['score'] : 'AI tóm tắt' ?></button><?php endif; ?></form>
+                                        </div>
                                         <?php if (ai_match_enabled()): ?>
                                             <dialog class="modal" id="ai-diary-<?= (int) $recordId ?>" aria-label="Phân tích nhật ký bằng AI">
                                                 <form method="post" action="<?= screen_escape($formAction) ?>" class="workspace-form modal-form"><?= $csrfField ?><input type="hidden" name="action" value="ai_review_diary"><input type="hidden" name="diary_id" value="<?= (int) $recordId ?>">

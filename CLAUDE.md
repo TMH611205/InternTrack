@@ -10,10 +10,11 @@ InternTrack is a Vietnamese-language internship and graduation-thesis management
 
 - Install deps (PHPMailer, dompdf for PDF export): `composer install`
 - Run: start Apache + MySQL in XAMPP, open `http://localhost/InternTrack/`
-- DB setup: create DB `interntrack` (utf8mb4_unicode_ci), import `database/interntrack.sql` (idempotent `CREATE TABLE IF NOT EXISTS`), then optionally `database/seed.sql` (local demo accounts only).
+- DB setup: create DB `interntrack` (utf8mb4_unicode_ci), import `database/interntrack.sql` (idempotent; schema, then local-only demo data after the `-- ==== DỮ LIỆU MẪU ====` line). Production: empty DB + `scripts/migrate.php`, which stops at that line.
 - Upgrade an existing DB: `C:\xampp\php\php.exe scripts\migrate.php` (adds missing tables / columns / ENUM values from `interntrack.sql`; idempotent; `--database=<name>` targets a copy). When you change the schema, edit `database/interntrack.sql` only; the migrator derives ALTERs from it.
 - Normalize old data to the school's majors and code formats (after migrate): `C:\xampp\php\php.exe scripts\normalize_school.php`.
 - Scheduled jobs: `scripts/cron.php` (hourly) runs daily reminders and a daily backup into `backups/` (git-ignored, web-blocked).
+- Tests: `scripts/test.php` (assert-based, refuses the real DB); see its header for setup.
 - Syntax check a file: `C:\xampp\php\php.exe -l <file>`
 - Config comes from env vars or a single git-ignored `.env` (there is no `.env.example`; the variable list is in `README.md`): `DB_*`, `MAIL_*`, `GEMINI_API_KEY`/`GEMINI_MODEL`. Never commit `.env` or put secrets anywhere tracked. Read via `app_env()` in `config/app.php`.
 
@@ -39,9 +40,9 @@ Single front controller: everything goes through `index.php`.
 - **Exports**: `export_csv()` writes real `.xlsx` (pure-PHP `config/zip.php`, no zip extension needed; `&format=csv` for CSV); `export_print()` renders the school document layout as HTML, or a real PDF via dompdf with `&format=pdf` (logo JPEG, no GD needed). Signature rows / unit / place are configurable on `admin/templates` (`DOCUMENT_TEMPLATES`, `app_setting('doc_sign_*')`). Backups are `.zip` (database.sql + uploads/).
 - **Internship extras** (`controllers/InternshipController.php`): allocation by preference (Gale-Shapley over positions, runs stored in `matching_runs` with `algorithm = internship_gs`), change / withdraw requests, weekly plans, daily warnings, report versions + comments (`item_comments`, `views/layouts/comments.php`). Content similarity of thesis submissions: `controllers/SimilarityController.php`. Training-system sync API: `controllers/SyncApiController.php` (`?api=sync`, `SYNC_API_KEY`).
 - **Matching** (`controllers/MatchingController.php`): Gale-Shapley (both sides), Serial Dictatorship, Hungarian; locked / confirmed theses are kept and reduce capacity; runs are stored in `matching_runs` and only `matching_publish()` writes `theses`.
-- **Admin tools** (`controllers/AdminToolsController.php`): audit log (`audit_record()`, called for every successful workspace action plus login/logout), daily reminders (`reminders_run_daily()` from `screen.php`, guarded by `app_settings`), announcements + calendar, statistics, CSV/print exports served by `?export=<type>` (`serve_export()`), SQL backup/restore, Excel/CSV user import, self-found placements, attendance, internship documents, company reviews, public company registration (`auth/register`).
+- **Admin tools** (`controllers/AdminToolsController.php`): audit log (`audit_record()`, called for every successful workspace action plus login/logout), daily reminders (`reminders_run_daily()` from `scripts/cron.php` only, guarded by `app_settings`), announcements + calendar, statistics, CSV/print exports served by `?export=<type>` (`serve_export()`), SQL backup/restore, Excel/CSV user import, self-found placements, attendance, internship documents, company reviews, public company registration (`auth/register`).
 - New screens use `kind => 'custom'` in `page-data.php`; their markup lives in `views/layouts/screens/<role>-<screen>.php` (shared helpers in `_common.php`, `_thesis-parts.php`). `load_screen_data()` falls through to `thesis_screen_data()` / `admin_tools_screen_data()`, and `handle_workspace_action()` falls through to `thesis_handle_action()` / `admin_tools_handle_action()` (each returns `['route', 'message']` or null).
-- Demo data for the thesis module: `database/seed-thesis.sql`. `notify_user(..., $email = true)` also emails when `MAIL_NOTIFY=1`.
+- `notify_user(..., $email = true)` also emails when `MAIL_NOTIFY=1`.
 - `config/app.php` installs a global error handler that converts PHP warnings/notices into `ErrorException`, so sloppy code throws.
 - Uploads: `store_uploaded_file()` validates real MIME and size (CV/report up to 5 MB, avatars 3 MB) into `uploads/<folder>/`.
 

@@ -25,6 +25,8 @@ foreach (array_slice($argv, 1) as $argument) {
 }
 $schemaFile = (string) file_get_contents(__DIR__ . '/../database/interntrack.sql');
 $schema = str_replace("\r\n", "\n", $schemaFile);
+// Chỉ lấy phần cấu trúc: dữ liệu mẫu sau dòng đánh dấu không bao giờ được đưa vào CSDL đang chạy.
+$schema = explode('-- ==== DỮ LIỆU MẪU ====', $schema, 2)[0];
 $databaseName = (string) $connection->query('SELECT DATABASE()')->fetchColumn();
 
 // Bảng / cột hiện có trước khi chạy.

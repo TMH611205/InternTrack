@@ -19,7 +19,16 @@ reminders_run_daily();
 echo date('Y-m-d H:i:s') . " · nhắc hạn: đã kiểm tra\n";
 
 if (app_setting('backup_last_run', '') !== date('Y-m-d') && app_setting('backup_auto', '1') === '1') {
-    $path = backup_store(14);
-    app_setting_set('backup_last_run', date('Y-m-d'));
-    echo date('Y-m-d H:i:s') . ' · sao lưu: ' . $path . ' (' . round(filesize($path) / 1048576, 1) . " MB)\n";
+    try {
+        $path = backup_store(14);
+        app_setting_set('backup_last_run', date('Y-m-d'));
+        echo date('Y-m-d H:i:s') . ' · sao lưu: ' . $path . ' (' . round(filesize($path) / 1048576, 1) . " MB)\n";
+    } catch (Throwable $error) {
+        error_log('InternTrack backup failed: ' . $error->getMessage());
+        foreach (page_all('SELECT id FROM users WHERE role = \'admin\' AND status = \'active\' AND scope_faculty IS NULL') as $admin) {
+            notify_user((int) $admin['id'], 'audit', 'Sao lưu tự động thất bại', 'Hãy kiểm tra dung lượng đĩa và nhật ký lỗi của máy chủ.', 'admin/audit');
+        }
+        fwrite(STDERR, 'Sao lưu thất bại: ' . $error->getMessage() . "\n");
+        exit(1);
+    }
 }

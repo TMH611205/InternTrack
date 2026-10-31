@@ -25,6 +25,25 @@ function company_sync_account_status(int $companyId, string $status): void
     }
 }
 
+// Ẩn trang chỉ chặn GET: các thao tác của trang bị ẩn (app_hidden_pages) phải bị chặn cả khi gửi POST trực tiếp.
+const SCOPED_ADMIN_BLOCKED_ACTIONS = ['backup_restore', 'kb_save', 'kb_delete', 'company_update', 'position_save', 'position_status', 'position_reject', 'settings_save'];
+const MENTOR_BLOCKED_ACTIONS = ['application_review', 'interview_schedule', 'position_save', 'position_status', 'profile_save'];
+
+function action_require_account_scope(string $action): void
+{
+    if (!in_array($action, SCOPED_ADMIN_BLOCKED_ACTIONS, true) && !in_array($action, MENTOR_BLOCKED_ACTIONS, true)) {
+        return;
+    }
+    $user = authenticated_user();
+    if ($user === null) {
+        return;
+    }
+    if (($user['role'] === 'admin' && !empty($user['scope_faculty']) && in_array($action, SCOPED_ADMIN_BLOCKED_ACTIONS, true))
+        || ($user['role'] === 'company' && !empty($user['is_mentor']) && in_array($action, MENTOR_BLOCKED_ACTIONS, true))) {
+        throw new DomainException('Tài khoản của bạn không có quyền thực hiện thao tác này.');
+    }
+}
+
 // Các hàm trong file này xử lý các thao tác nghiệp vụ chính của hệ thống.
 // Mỗi thao tác kiểm tra quyền, validate dữ liệu đầu vào và cập nhật DB theo role tương ứng.
 function action_user(array $allowedRoles): array
@@ -206,7 +225,7 @@ function serve_workspace_download(string $type, int $recordId, array $user): nev
     } elseif ($type === 'cv') {
         $statement = $connection->prepare(
             'SELECT s.cv_file AS file_path, CONCAT(u.full_name, \' - CV\') AS title FROM students s JOIN users u ON u.id = s.user_id
-             WHERE s.id = ? AND (s.user_id = ? OR ? = \'admin\' OR EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND (i.lecturer_id = ? OR i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor))) OR EXISTS (SELECT 1 FROM applications a JOIN positions p ON p.id = a.position_id WHERE a.student_id = s.id AND p.company_id = ?)) LIMIT 1'
+             WHERE s.id = ? AND (s.user_id = ? OR ? = \'admin\' OR EXISTS (SELECT 1 FROM internships i WHERE i.student_id = s.id AND (i.lecturer_id = ? OR i.company_id = ? AND (@it_mentor IS NULL OR i.mentor_user_id = @it_mentor))) OR (@it_mentor IS NULL AND EXISTS (SELECT 1 FROM applications a JOIN positions p ON p.id = a.position_id WHERE a.student_id = s.id AND p.company_id = ?))) LIMIT 1'
         );
         $statement->execute([$recordId, $user['id'], $user['role'], $user['lecturer_id'] ?? 0, $user['company_id'] ?? 0, $user['company_id'] ?? 0]);
     } elseif ($type === 'task') {
@@ -264,6 +283,7 @@ function serve_workspace_download(string $type, int $recordId, array $user): nev
 // Mỗi action tương ứng với một chức năng như ứng tuyển, đánh giá, nhiệm vụ, profile, quản trị.
 function handle_workspace_action(string $action, string $route, array $input, array $files): string
 {
+    action_require_account_scope($action);
     $connection = database();
     $successMessage = 'Đã lưu thay đổi.';
     // Bản ghi trước khi sửa, để nhật ký lưu giá trị trước / sau.
@@ -416,6 +436,9 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             if (page_one('SELECT id FROM applications WHERE student_id = ? AND position_id = ?', [$user['student_id'], $positionId])) {
                 throw new DomainException('Bạn đã ứng tuyển vị trí này rồi.');
             }
+            if (page_count('SELECT COUNT(*) FROM internships WHERE student_id = ? AND status IN (\'planned\', \'active\')', [$user['student_id']]) > 0) {
+                throw new DomainException('Bạn đang có kỳ thực tập nên không thể ứng tuyển thêm.');
+            }
             internship_require_registration((int) $user['student_id']);
             $connection->prepare('INSERT INTO applications (student_id, position_id, cv_file, cover_letter) VALUES (?, ?, ?, ?)')->execute([
                 $user['student_id'],
@@ -467,6 +490,11 @@ function handle_workspace_action(string $action, string $route, array $input, ar
                     action_value($input, 'note', 2000) ?: null,
                 ]);
                 if ($status === 'accepted') {
+                    // Khóa hồ sơ sinh viên: hai doanh nghiệp nhận cùng lúc thì người sau thấy kỳ thực tập của người trước.
+                    $connection->prepare('SELECT id FROM students WHERE id = ? FOR UPDATE')->execute([$application['student_id']]);
+                    if (page_count('SELECT COUNT(*) FROM internships WHERE student_id = ? AND status IN (\'planned\', \'active\')', [$application['student_id']]) > 0) {
+                        throw new DomainException('Sinh viên này đã có kỳ thực tập đang mở.');
+                    }
                     $acceptedCount = page_count('SELECT COUNT(*) FROM applications WHERE position_id = ? AND status = \'accepted\' AND id <> ?', [$application['position_id'], $applicationId]);
                     if ($acceptedCount >= (int) $application['quantity']) {
                         throw new DomainException('Vị trí đã đủ số lượng thực tập sinh.');
@@ -840,6 +868,9 @@ function handle_workspace_action(string $action, string $route, array $input, ar
             $status = action_value($input, 'status', 20) === 'draft' ? 'draft' : 'submitted';
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $hours === false || $hours < 0 || $hours > 24 || $content === '') {
                 throw new DomainException('Ngày, số giờ hoặc nội dung nhật ký không hợp lệ.');
+            }
+            if ($date > date('Y-m-d')) {
+                throw new DomainException('Không thể ghi nhật ký cho ngày trong tương lai.');
             }
             $existing = page_one('SELECT id, status FROM diaries WHERE internship_id = ? AND diary_date = ?', [$internshipId, $date]);
             if ($existing && !in_array($existing['status'], ['draft', 'rejected'], true)) {

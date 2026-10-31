@@ -784,3 +784,7 @@ document.querySelectorAll("[data-ai-topic-use]").forEach((button) => {
     else form.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 });
+
+// Menu dài tự cuộn: đưa mục đang mở vào tầm nhìn sau khi tải trang.
+const activeNavLink = document.querySelector(".primary-nav .is-active");
+activeNavLink?.parentElement.scrollTo({ top: activeNavLink.offsetTop - activeNavLink.parentElement.offsetTop - 60 });
